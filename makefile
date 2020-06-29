@@ -175,7 +175,7 @@ skel/.bash_profile: skel/.bashrc
 	cp $^ $@
 
 BASICDIRS=$(LBIN) $(HOME)/warts $(HOME)/warts/ssl $(HOME)/ssl \
-	$(HOME)/.ssh $(HOME)/logs $(HOME)/init.d $(HOME)/backups \
+	$(HOME)/.ssh $(HOME)/logs $(HOME)/init.d $(HOME)/backups/tmp \
 	$(HOME)/minters $(HOME)/binders $(HOME)/batches
 
 basicdirs: $(BASICDIRS)
@@ -184,11 +184,12 @@ basicdirs: $(BASICDIRS)
 # Create backups directory and tmp subdir; this is so TMPDIR can be set to it,
 #    avoiding overuse and performance problems using /tmp.
 # mkdir -p $(HOME)/../n2tbackup/backups/tmp; \
-$(HOME)/backups:
+
+$(HOME)/backups/tmp:
 	if [[ -d $(HOME)/../n2tbackup ]]; then \
 		ln -s $(HOME)/../n2tbackup/backups $@; \
 	fi
-	mkdir -p $@/tmp
+	mkdir -p $@
 
 $(LBIN) $(HOME)/warts $(HOME)/warts/ssl $(HOME)/init.d $(HOME)/batches:
 	mkdir -p $@
