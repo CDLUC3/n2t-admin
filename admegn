@@ -19,7 +19,7 @@ summary="
      $me warts
      $me mdump [ -v ] [ Minter/nog.bdb ... ] [ > MinterStates ]
      $me mload [ -nv ] Dir [ < MinterStates ]
-     $me msync RemoteHost
+     $me msync RemoteUserHost
      (from backup) db_dump egg.bdb | ssh \$HOST '(cd \$dbdir; db_load egg.bdb)'
      $me validate_naans [ NAANsFile ]
      $me rcheck [ -v ]
@@ -63,7 +63,7 @@ DESCRIPTION
         \$ db_dump egg.bdb | ssh \$rhost \\
 	       "( cd \$dbdir; TMPDIR=~/backups/tmp db_load egg.bdb )"
 
-       It may be a good idea to clean up the remote \$dbdir directory
+       XXX? It may be a good idea to clean up the remote \$dbdir directory
        beforehand by removing any __db.* and/or log.* files as they may
        interfere with the new environment.
 
@@ -95,8 +95,9 @@ DESCRIPTION
             > done
 
        The "msync" form keeps the current host's minters in sync with those
-       of the RemoteHost. It more or less follows the steps outlined above.
-       By running it once a day or hour, catching the current host is fast.
+       of the RemoteUserHost (eg, n2t@ids-n2t2-prd.n2t.net). It more or less
+       follows the steps outlined above. By running it once a day or hour,
+       catching the current host is fast.
 
        The "validate_naans" form performs consistency and uniqueness checks
        on a NAANsFile containing ANVL-formatted NAAN records, returning a
@@ -906,18 +907,18 @@ EOT
 
 function msync {
 
-	local rhost=${1:-}
-	[[ ! "$rhost" ]] && {
+	local ruserhost=${1:-}
+	[[ ! "$ruserhost" ]] && {
 		echo "Error: no remote host specified" 1>&2
 		return 1
 	}
-	ssh n2t@$rhost "(
+	ssh $ruserhost "(
 		cd ~/sv/cur/apache2
 		for p in ezid oca yamz snac
 		do
 			admegn mdump minters/\$p/ark/?????/*/nog.bdb
 		done
-	)" | admegn mload ~/sv/cur/apache2
+	)" | admegn mload ~/sv/cur/apache2/minters
 }
 
 # these sources usually overridden during pfx validation

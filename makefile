@@ -183,13 +183,12 @@ basicdirs: $(BASICDIRS)
 # xxx test this!
 # Create backups directory and tmp subdir; this is so TMPDIR can be set to it,
 #    avoiding overuse and performance problems using /tmp.
+# mkdir -p $(HOME)/../n2tbackup/backups/tmp; \
 $(HOME)/backups:
 	if [[ -d $(HOME)/../n2tbackup ]]; then \
-		mkdir -p $(HOME)/../n2tbackup/backups/tmp; \
 		ln -s $(HOME)/../n2tbackup/backups $@; \
-	else \
-		mkdir -p $@/tmp; \
 	fi
+	mkdir -p $@/tmp
 
 $(LBIN) $(HOME)/warts $(HOME)/warts/ssl $(HOME)/init.d $(HOME)/batches:
 	mkdir -p $@
