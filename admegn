@@ -687,7 +687,8 @@ function mdump {
 				"specify minter paths explicitly."
 			exit 1
 		}
-		minters=( $ap_top/minters/*/ark/?????/*/nog.bdb )
+		minters=( $apminters/*/ark/?????/*/nog.bdb )
+		#minters=( $ap_top/minters/*/ark/?????/*/nog.bdb )
 	fi
 	# First line of output identifies time and server.
 	# xxx Probably should use xargs
@@ -918,7 +919,8 @@ function msync {
 		do
 			admegn mdump minters/\$p/ark/?????/*/nog.bdb
 		done
-	)" | admegn mload ~/sv/cur/apache2/minters
+	)" | admegn mload $apminters
+	#)" | admegn mload ~/sv/cur/apache2/minters
 }
 
 # these sources usually overridden during pfx validation
@@ -1643,6 +1645,9 @@ function backup {
 	local src dst took
 	local txnlog=~/sv/cur/apache2/logs/transaction_log.rlog
 
+	# Add TMPDIR because of Berkeley DB performance with default "/"
+	export TMPDIR=$HOME/backups/tmp
+
 	echo ==== creating backups $(date) ====
 	# make sure our base directories are set up; quell complaints
 	mkdir -p ~/backups/{minters,shoulders,binders,prefixes}
@@ -1669,17 +1674,30 @@ function backup {
 
 	echo Backing up binders.
 	local binders
-	binders=$( shopt -s nullglob; echo ~/binders/* )
+	#binders=$( shopt -s nullglob; echo ~/binders/* )
+	binders=$( shopt -s nullglob; echo $apbinders/* )
 	for binder in $binders
 	do
 		b=$( basename $binder )
-		[[ $b =~ _test$ || ! -e ~/binders/$b/egg.bdb ]] &&	# skip
+		#[[ $b =~ _test$ || ! -e ~/binders/$b/egg.bdb ]] &&	# skip
+		[[ $b =~ _test$ || ! -e $apbinders/$b/egg.bdb ]] &&	# skip
 			continue	# if not a binder or not a real binder
-		src=~/binders/$b
-		dst=~/backups/binders/$b/$now
+
+		# In order to run egg against a backup binder, and because of
+		# how egg requires long ugly binder names in anticipation of
+		# flatter database-server-based binder access (instead of tidy
+		# short names made unique by file hierarchy), we need the
+		# long binder name to be the final path component before the
+		# egg.bdb file. The awkward consequence is that the timestamp
+		# file path component precedes it.
+
+		#src=~/binders/$b
+		src=$apbinders/$b
+		dst=~/backups/binders/$now/$b
+		#dst=~/backups/binders/$b/$now
 		mkdir -p $dst
-		echo db_hotbackup for $b
-		TMPDIR=~/backups/tmp db_hotbackup -h $src -b $dst
+		echo Running: db_hotbackup -h $src -b $dst
+		db_hotbackup -h $src -b $dst
 		#took=$( ( time db_hotbackup -h $src -b $dst ) 2>&1 )
 		#echo " " $( sed -n s/real//p <<< "$took" )
 	done
@@ -1689,13 +1707,14 @@ function backup {
 	for binder in $binders
 	do
 		b=$( basename $binder )
-		[[ $b =~ _test$ || ! -e ~/binders/$b/egg.bdb ]] &&	# skip
+		#[[ $b =~ _test$ || ! -e ~/binders/$b/egg.bdb ]] &&	# skip
+		[[ $b =~ _test$ || ! -e $apbinders/$b/egg.bdb ]] &&	# skip
 			continue	# if not a binder or not a real binder
-		echo db_verify for $b
-		dst=~/backups/binders/$b/$now
+		#dst=~/backups/binders/$b/$now
+		dst=~/backups/binders/$now/$b
+		echo Running db_verify for $b: db_verify $dst/egg.bdb
 		#msg=$( time db_verify $dst/egg.bdb 2>&1 ) || {
- 		# Add TMPDIR because of performance problems using /
- 		msg=$( TMPDIR=~/backups/tmp db_verify $dst/egg.bdb 2>&1 ) || {
+ 		msg=$( db_verify $dst/egg.bdb 2>&1 ) || {
 			echo "$msg" > $dst/VERIFY_FAILED
 			echo "$b backup - NOT OK"
 			echo "$msg"
@@ -1839,7 +1858,8 @@ function backup_rotate {
 	do
 		[[ $bbk =~ _test$ ]] &&
 			continue	# test binder -- skip
-		[[ ! -e ~/binders/$( basename $bbk )/egg.bdb ]] &&
+		#[[ ! -e ~/binders/$( basename $bbk )/egg.bdb ]] &&
+		[[ ! -e $apbinders/$( basename $bbk )/egg.bdb ]] &&
 			continue	# not a binder -- skip
 
 		splus	$bbk           14 	$day7th \
@@ -1917,6 +1937,8 @@ svumode=$( sed 's/^[^:]*://' <<< $SVU_USING )
 [[ "$svumode" ]] ||
 	svumode=cur		# if none, default to "cur"
 ap_top=$HOME/sv/$svumode/apache2
+apbinders=$ap_top/binders
+apminters=$ap_top/minters
 
 cmd=$1			# the first command word is the operation
 shift			# $1 is now first command arg
