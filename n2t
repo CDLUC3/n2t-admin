@@ -19,7 +19,8 @@ This script supports commands that automate common N2T service admin tasks.
   rollout     stop public-facing server, install new code, restart server
   test        test code installed in currently running public-facing server
   rollback    back out of the last rollout, reverting to the prior rollout
-  checkpoint  mark rollback point (to be run before "hg update")
+  checkpoint  XXX mark rollback point (to be run before "hg update")
+  checkpoint  XXX mark rollback point (to be run before "git checkout")
   cron stop   install cronstop file to (by default) disable all crontab jobs
   cron start  install or re-enable usual crontab jobs
   cron works  check if a cronstop file exists; if so exit 1, else exit 0
@@ -58,11 +59,10 @@ function check_changes {
 		echo "PANIC -- EGNAPA_HOST ($EGNAPA_HOST) looks wrong" 1>&2
 		exit 1
 	}
-	# XXX change hg to git
-	hgid=$( hg identify | sed 's/ .*//' )
-		# in git would do this check with "git diff --quiet"
+	#hgid=$( hg identify | sed 's/ .*//' )
+	gitid=$( git show --oneline | sed 's/ .*//;q' )
 	changes=
-	[[ ! $hgid || "$hgid" =~ \+ ]] &&
+	[[ ! $gitid || "$gitid" =~ \+ ]] &&
 		changes=1
 	[[ ! $changes || $force ]] &&
 		return 0
@@ -193,8 +193,9 @@ function check_minders {
 
 function n2t_import {	# assumes caller ran check_changes!
 
-	hg pull		# hg pull -u only updates to tip if changesets pulled
-	hg update	# this makes sure that we update to the tip
+	#hg pull	# hg pull -u only updates to tip if changesets pulled
+	#hg update	# this makes sure that we update to the tip
+	git pull
 	# XXX maybe should first do a "make clean" to be safe?
 	$mkperl
 	make
@@ -239,7 +240,8 @@ function n2t_rollout {	# assumes caller ran check_changes!
 	# NB: local ALWAYS succeeds, so don't initialize via command
 	# in a "local" and expect to save the return status!
 	local dvcsid
-	dvcsid=$( hg identify | sed 's/ .*//' )
+	#dvcsid=$( hg identify | sed 's/ .*//' )
+	dvcsid=$( git show --oneline | sed 's/ .*//;q' )
 
 	# change to directory of the running production server
 	(cd $aptop || {
@@ -289,7 +291,8 @@ function n2t_rollout {	# assumes caller ran check_changes!
 	)
 	[[ $err ]] &&
 		return 1
-	echo "`date`: rolled out binder revision `hg id -in`" \
+	#echo "`date`: rolled out binder revision `hg id -in`" \
+	echo "`date`: rolled out binder revision $dvcsid" \
 		>> ~/logs/rollout_log
 	return 0
 }
@@ -299,21 +302,25 @@ function n2t_rollout {	# assumes caller ran check_changes!
 # number is saved for the purpose of enabling possible later rollback.
 #
 function n2t_checkpoint {
-	hg identify | sed 's/ .*//' > .rollback		# save current revision
+	#hg identify | sed 's/ .*//' > .rollback	# save current revision
+	git show --oneline | sed 's/ .*//;q' > .rollback # save current revision
 }
 
 # Rollback to the checkpoint revision number, usually saved prior to last
 # import.  It's not right to switch to the previous revision in revision log,
 # as often there will be more than one revision since the previous rollout.
 # A second rollback will not undo a rollback (it will not do a re-rollout).
-# To undo a rollback, do "hg update" then "n2t rollout".
+## To undo a rollback, do "hg update" then "n2t rollout".
+# To undo a rollback, do "git checkout" then "n2t rollout".
 #
 function n2t_rollback {	# assumes caller ran check_changes!
 
 	local prior
 	[[ -r .rollback ]] &&
 		prior=$( < .rollback )
-	hg update -r ${prior:--2}	# if $prior empty, default to -2
+	#hg update -r ${prior:--2}	# if $prior empty, default to -2
+	# XXX untested!!
+	git checkout ${prior:-ERROR}	# if $prior empty, default to -2
 
 	$mkperl
 	make		# skip "make test" as now we're probably in a hurry
