@@ -14,7 +14,7 @@ fi
 export PERL_INSTALL_BASE=~/local	# note: this can change via svu
 export PERL5LIB=~/local/lib/perl5	# note: this can change via svu
 export LC_ALL=C		# set computer mode locale, so all chars/scripts work
-export TMPDIR=$HOME/sv		# make Berkeley DB TMPDIR not be tiny /tmp
+export TMPDIR=~/backups		# make Berkeley DB TMPDIR not be tiny /tmp
 
 export LESS='ieFRX'	# ignore case, quit on 2nd EOF, honor color escapes,...
 export LESSCHARSET=utf-8
@@ -199,7 +199,6 @@ function j() { jobs -l "$@"; }
 function j() { jobs -l "$@"; }
 function m() { less "$@"; }
 function q() { exit "$@"; }
-function rl() { rlogin "$@"; }
 function z() { suspend "$@"; }
 function pd() { pushd "$@"; }
 function pp() { popd "$@"; }

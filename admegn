@@ -12,14 +12,18 @@
 # xxx do a system version of this, eg, EGNAPA_NOTIFY?
 notify=jak@ucop.edu	# xxx backup, sysupdate, or other failure
 
+# Add TMPDIR because of Berkeley DB performance with default "/"
+export TMPDIR=~/backups
+
 me=$( basename $0 )
 function usage {
 
 summary="
      $me warts
-     $me mdump [ -v ] [ Minter/nog.bdb ... ] [ > MinterStates ]
-     $me mload [ -nv ] Dir [ < MinterStates ]
-     $me msync RemoteUserHost
+     $me binder_load Dbdir < db_dump_file
+     $me msync RemoteHost
+       $me mdump [ -v ] [ Minter/nog.bdb ... ] [ > MinterStates ]
+       $me mload [ -nv ] Dir [ < MinterStates ]
      (from backup) db_dump egg.bdb | ssh \$HOST '(cd \$dbdir; db_load egg.bdb)'
      $me validate_naans [ NAANsFile ]
      $me rcheck [ -v ]
@@ -53,22 +57,32 @@ DESCRIPTION
        exit status indicates an error.
 
        Some important services are best done with other tools. For example,
-       to migrate an entire binder to a new system, change into an ezid
-       binder directory (with the egg.bdb file in it). The binder must be
-       quiescent, such as a recent backup copy. Then do something like
+       to migrate an entire binder to a new system, change into a quiescent
+       ezid binder directory (one with the egg.bdb file in it), usually a
+       recent backup copy. Then do something like
 
-        \$ export TMPDIR=~/backups/tmp
+        \$ export TMPDIR=~/backups
         \$ rhost=n2t@ids-n2t2-prd.n2t.net
         \$ dbdir=sv/cur/apache2/binders/egg_n2t_prd_public.real_ezid_s_ezid
+        \$ ssh \$rhost "( cd \$dbdir; rm log.* __db.* )"
         \$ db_dump egg.bdb | ssh \$rhost \\
-	       "( cd \$dbdir; TMPDIR=~/backups/tmp db_load egg.bdb )"
+	       "( cd \$dbdir; TMPDIR=~/backups db_load egg.bdb )"
 
-       XXX? It may be a good idea to clean up the remote \$dbdir directory
-       beforehand by removing any __db.* and/or log.* files as they may
-       interfere with the new environment.
+       If you don't clean up the remote \$dbdir directory beforehand by
+       removing any __db.* and/or log.* files, bad things can happen when
+       they interfere with the new environment. Also, you could try
 
+        \$ ssh \$rhost "admegn binder_load \$dbdir < db_dump_file"
+
+       XXX needed?
        The "warts" form takes the ~/warts/env.sh bash scripts and creates a
        corresponding ~/warts/env.yaml form of its settings (in YAML format).
+
+       The "msync" form keeps the current host's minters in sync with those
+       of the RemoteHost (eg, n2t@ids-n2t2-prd.n2t.net). It more or less
+       follows the steps outlined below. Running it every so often (eg, once
+       a day or hour) keeps minters in sync. The more frequently it is run,
+       the less work each iteration takes and the sooner it completes.
 
        The "mdump" form writes minter states in ANVL format to stdout.
        If no minters are specified, it looks for minters in a "minters"
@@ -93,11 +107,6 @@ DESCRIPTION
             > do
             >     $me mload \$sa/minters < m\$p
             > done
-
-       The "msync" form keeps the current host's minters in sync with those
-       of the RemoteUserHost (eg, n2t@ids-n2t2-prd.n2t.net). It more or less
-       follows the steps outlined above. By running it once a day or hour,
-       catching the current host is fast.
 
        The "validate_naans" form performs consistency and uniqueness checks
        on a NAANsFile containing ANVL-formatted NAAN records, returning a
@@ -904,6 +913,28 @@ EOT
 		perl -00 -wne "$perl_mload"
 }
 
+# load local binder from scratch using BDB dump on stdin
+
+function binder_load {
+
+	local dbdir=${1:-}
+	[[ ! "$dbdir" ]] && {
+		echo "Error: no binder directory specified" 1>&2
+		return 1
+	}
+	( cd $dbdir
+		rm -f log.* __db.*
+		local envfiles
+		envfiles=$( ls log.* __db.* | grep -v '\*' )
+		[[ "$envfiles" ]] &&  {
+			echo Error: some env files still exist: log.* __db.*
+			return 1
+		}
+		db_load egg.bdb
+		#TMPDIR=~/backups db_load egg.bdb
+	)
+}
+
 # sync local minters up from remote state
 
 function msync {
@@ -1645,9 +1676,6 @@ function backup {
 	local src dst took
 	local txnlog=~/sv/cur/apache2/logs/transaction_log.rlog
 
-	# Add TMPDIR because of Berkeley DB performance with default "/"
-	export TMPDIR=$HOME/backups/tmp
-
 	echo ==== creating backups $(date) ====
 	# make sure our base directories are set up; quell complaints
 	mkdir -p ~/backups/{minters,shoulders,binders,prefixes}
@@ -1659,7 +1687,8 @@ function backup {
 	dst=~/backups/shoulders/$now
 	echo Backing up shoulders and transaction_log to $dst.
 	mkdir $dst
-	cp -Lpr ~/shoulders/* ~/sv/cur/apache2/logs/transaction_log.rlog $dst
+	#cp -Lpr ~/shoulders/* ~/sv/cur/apache2/logs/transaction_log.rlog $dst
+	cp -Lpr ~/sv/cur/apache2/logs/transaction_log.rlog $dst
 	# xxx ouch, these are big logs, getting backed up with shoulders
 
 	dst=~/backups/prefixes/$now
@@ -1697,6 +1726,7 @@ function backup {
 		#dst=~/backups/binders/$b/$now
 		mkdir -p $dst
 		echo Running: db_hotbackup -h $src -b $dst
+		echo "XXX  TMPDIR: $TMPDIR"
 		db_hotbackup -h $src -b $dst
 		#took=$( ( time db_hotbackup -h $src -b $dst ) 2>&1 )
 		#echo " " $( sed -n s/real//p <<< "$took" )
@@ -1916,6 +1946,8 @@ function warts2yaml {
 			split /\n/, $environment;
 		return;
 	}
+	say '# File created by "admegn warts".';
+	say '';
 	foreach my $file (@ARGV) {
 		bash2yaml($file);		# outputs to stdout
 	}
@@ -1989,16 +2021,20 @@ mong)
 	#mongodaemon "$@" - - -
 	exit
 	;;
+binder_load)
+	binder_load $@
+	exit
+	;;
+msync)
+	msync $@
+	exit
+	;;
 mdump)
 	mdump $@
 	exit
 	;;
 mload)
 	mload $@
-	exit
-	;;
-msync)
-	msync $@
 	exit
 	;;
 validate_naans)

@@ -148,47 +148,53 @@ crontab:
 
 # Goal here is to reflect basic skeleton in the maintenance/role account.
 
-#basicfiles: egnapa
-basicfiles: skel/.bash_profile
+basicfiles:
 	@cd skel; \
-	asked=; \
-	for f in `find . | sed -e 's,^\./,,' -e '/^ssl\//d'`; \
+	for f in .bash_profile .bashrc .gitconfig .svudef .vimrc ; \
 	do \
-		if [[ ! -f $$f ]]; then \
-			true; \
-		elif [[ ! -f $(HOME)/$$f ]]; then \
+		if [[ $$f -nt $(HOME)/$$f ]]; then \
+			echo cp -p $$f $(HOME)/$$f; \
 			cp -p $$f $(HOME)/$$f; \
-		elif [[ $$f =~ .hgrc|.bashrc|.bash_profile ]]; then \
-			cmp -s $$f $(HOME)/$$f || echo "Warning: skel/$$f" \
-				"different from $(HOME)/$$f"; \
-		elif [[ $$f -nt $(HOME)/$$f ]]; then \
-			[[ $$asked ]] || echo -e \
-    "Take care overwriting files (eg, .bashrc) from skel/ with content\nto" \
-    "preserve.  Content from skel may be better moved manually."; \
-			cp -ip $$f $(HOME)/$$f; \
-			asked=1; \
 		fi; \
 	done; true
-	@chmod 600 $(HOME)/.hgrc
 
-skel/.bash_profile: skel/.bashrc
-	cp $^ $@
+#basicfiles: skel/.bash_profile
+#	@cd skel; \
+#	asked=; \
+#	for f in `find . | sed -e 's,^\./,,' -e '/^ssl\//d'`; \
+#	do \
+#		if [[ ! -f $$f ]]; then \
+#			true; \
+#		elif [[ ! -f $(HOME)/$$f ]]; then \
+#			cp -p $$f $(HOME)/$$f; \
+#		elif [[ $$f =~ .hgrc|.bashrc|.bash_profile ]]; then \
+#			cmp -s $$f $(HOME)/$$f || echo "Warning: skel/$$f" \
+#				"different from $(HOME)/$$f"; \
+#		elif [[ $$f -nt $(HOME)/$$f ]]; then \
+#			[[ $$asked ]] || echo -e \
+#    "Take care overwriting files (eg, .bashrc) from skel/ with content\nto" \
+#    "preserve.  Content from skel may be better moved manually."; \
+#			cp -ip $$f $(HOME)/$$f; \
+#			asked=1; \
+#		fi; \
+#	done; true
+#	@chmod 600 $(HOME)/.hgrc
 
 BASICDIRS=$(LBIN) $(HOME)/warts $(HOME)/warts/ssl $(HOME)/ssl \
-	$(HOME)/.ssh $(HOME)/logs $(HOME)/init.d $(HOME)/backups/tmp \
+	$(HOME)/.ssh $(HOME)/logs $(HOME)/init.d $(HOME)/backups \
 	$(HOME)/minters $(HOME)/binders $(HOME)/batches
 
 basicdirs: $(BASICDIRS)
 
 # xxx test this!
-# Create backups directory and tmp subdir; this is so TMPDIR can be set to it,
+# Create backups directory so that TMPDIR can be set to it,
 #    avoiding overuse and performance problems using /tmp.
 # mkdir -p $(HOME)/../n2tbackup/backups/tmp; \
+	#if [[ -d $(HOME)/../n2tbackup ]]; then \
+	#	ln -s $(HOME)/../n2tbackup/backups $(HOME)/backups; \
+	#fi
 
-$(HOME)/backups/tmp:
-	if [[ -d $(HOME)/../n2tbackup ]]; then \
-		ln -s $(HOME)/../n2tbackup/backups $@; \
-	fi
+$(HOME)/backups:
 	mkdir -p $@
 
 $(LBIN) $(HOME)/warts $(HOME)/warts/ssl $(HOME)/init.d $(HOME)/batches:
