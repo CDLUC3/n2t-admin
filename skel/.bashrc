@@ -71,6 +71,9 @@ alias venv_on="source ${VENV_DIR}/bin/activate"
 alias venv_off="deactivate"
 
 # Some git settings
+function gitid() {
+	git show --oneline | sed 's/ .*//;q'
+}
 
 # Some aliases that make n2t/eggnog development and testing easier.
 #
