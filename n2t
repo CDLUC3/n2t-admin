@@ -21,6 +21,7 @@ This script supports commands that automate common N2T service admin tasks.
   rollback    back out of the last rollout, reverting to the prior rollout
   checkpoint  XXX mark rollback point (to be run before "hg update")
   checkpoint  XXX mark rollback point (to be run before "git checkout")
+  cfq <args>  configuration query via egg with preset --home \$sa
   cron stop   install cronstop file to (by default) disable all crontab jobs
   cron start  install or re-enable usual crontab jobs
   cron works  check if a cronstop file exists; if so exit 1, else exit 0
@@ -104,7 +105,8 @@ function check_default_binders {
 		# a complete parse into printf -v (trick to set bash variable
 		# names and values) commands, and then eval the output string.
 
-		var_val_pairs=$( egg bxname --all $binder | sed -n \
+		#var_val_pairs=$( egg bxname --all $binder | sed -n \
+		var_val_pairs=$( perl -Mblib egg bxname --all $binder | sed -n \
 			's/^\([^:]*\): \(.*\)/printf -v "\1" "%s" "\2"; /p' )
 		eval "$var_val_pairs"
 
@@ -480,6 +482,11 @@ test)
 	# NB: do NOT use perl's -Mblib option, which tests UNINSTALLED code.
 	#
 	perl t/egn_post_install_n2t.t
+	exit
+	;;
+
+cfq)
+	perl -Mblib egg cfq "$@"
 	exit
 	;;
 

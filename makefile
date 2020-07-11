@@ -137,7 +137,7 @@ export EGNAPA_SSL_CHAINFILE=\n\
 	#fi
 
 crontab:
-	@ ctab=crontab.master; \
+	@ ctab=crontab.main; \
 	[[ -e cronstop ]] && ctab=cronstop; \
 	crontab -l > crontab_saved; \
 	cmp --silent crontab_saved $$ctab && { \

@@ -5,7 +5,7 @@
 # with -l (login) to set environment and ensure "svu cur" is in effect.
 # This file is generic and runs on various classes of host (dev, stg, prd)
 # which share a common configuration file (eggnog_conf) that defines hosts
-# and roles, all queryable via "egg cfq ...". Default SHELL is /bin/sh.
+# and roles, all queryable via "egg cfq ...". Default SHELL is /bin/sh. 
 
 EGG = '--home /apps/n2t/sv/cur/apache2'
 PATH = '/apps/n2t/sv/cur/bin:/apps/n2t/local/bin:/usr/bin:/bin'
