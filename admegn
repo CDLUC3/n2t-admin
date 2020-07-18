@@ -69,10 +69,10 @@ DESCRIPTION
 	       "( cd \$dbdir; TMPDIR=~/backups db_load egg.bdb )"
 
        If you don't clean up the remote \$dbdir directory beforehand by
-       removing any __db.* and/or log.* files, bad things can happen when
-       they interfere with the new environment. Also, bad might happen if
-       you're loading a new binder that will be used as it is appearing,
-       so you might want to turn off apache.
+       removing egg.bdb and any __db.* and/or log.* files, bad things can
+       happen when they interfere with the new environment. Also, bad might
+       happen if you're loading a new binder that will be used as it is
+       appearing, so you might want to turn off apache.
 
        Also, you could have the dump file locally and just call
 
@@ -927,10 +927,10 @@ function binder_load {
 		echo "Error: no binder directory specified" 1>&2
 		return 1
 	}
-	[[ ! "$dbdump" ]] && {
-		echo "Error: no binder dump specified" 1>&2
-		return 1
-	}
+	#[[ ! "$dbdump" ]] && {
+	#	echo "Error: no binder dump specified" 1>&2
+	#	return 1
+	#}
 
 	cd $dbdir/..
 	local sbdr=$( basename $dbdir )		# short binder name
@@ -955,11 +955,17 @@ function binder_load {
 	else
 		mkdir $sbdr
 	fi
-	local tail=$( basename $dbdump )	# hopefully timestamped name
-	date > $sbdr/FROM_BACKUP_$tail
 
 	cd $sbdr;
-	db_load egg.bdb < $dbdump
+	if [[ "$dbdump" ]]
+	then
+		local tail=$( basename $dbdump ) # hopefully timestamped name
+		date > FROM_BACKUP_$tail
+		db_load egg.bdb < $dbdump
+	else
+		date > FROM_BACKUP
+		db_load egg.bdb		# from STDIN
+	fi
 	# NB: make sure TMPDIR env var is other than /
 }
 
