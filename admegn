@@ -20,7 +20,7 @@ function usage {
 
 summary="
      $me warts
-     $me binder_load Dbdir Dbdump_file
+     $me binder_load Dbdir [ Dbdump_file ]
      $me msync RemoteHost
        $me mdump [ -v ] [ Minter/nog.bdb ... ] [ > MinterStates ]
        $me mload [ -nv ] Dir [ < MinterStates ]
