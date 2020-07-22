@@ -21,10 +21,16 @@ This script supports commands that automate common N2T service admin tasks.
   rollback    back out of the last rollout, reverting to the prior rollout
   checkpoint  XXX mark rollback point (to be run before "hg update")
   checkpoint  XXX mark rollback point (to be run before "git checkout")
-  cfq <args>  configuration query via egg with preset --home \$sa
+
   cron stop   install cronstop file to (by default) disable all crontab jobs
   cron start  install or re-enable usual crontab jobs
   cron works  check if a cronstop file exists; if so exit 1, else exit 0
+
+  cfq <query>  configuration query via egg with preset --home \$sa
+
+  ezid <args>  run egg command <args> on public ezid binder
+  oca  <args>  run egg command <args> on public oca binder
+  yamz <args>  run egg command <args> on public yamz binder
 
 The first three commands above reflect the normal sequence.  Use "rollback"
 only if "test" failed.  Use "checkpoint" if you're not using "import".
@@ -487,6 +493,12 @@ test)
 
 cfq)
 	perl -Mblib egg cfq "$@"
+	exit
+	;;
+
+ezid|oca|yamz)
+	perl -Mblib egg -d $aptop/binders/$Command --user $Command \
+		--isolator public "$@"
 	exit
 	;;
 
