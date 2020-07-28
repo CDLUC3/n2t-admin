@@ -165,37 +165,35 @@ function check_default_binders {
 
 function check_minders {
 
-	for m in binders minters shoulders
-	do
-		# Don't want to overwrite any existing binders, but we want
-		# make sure (eg, first time deploy ever on new system) that
-		# at least some binders are in place (that's what
-		# check_default_binders is for). Regarding minters and
-		# shoulders, we don't copy in anything if there's already a
-		# minters (shoulders) directory, but for the first time, we
-		# do copy in fresh defaults.
+	# Do binders.
+	# Don't want to overwrite any existing binders, but we want make sure
+	# (eg, first time deploy ever on new system) that at least some
+	# binders are in place (that's what check_default_binders is for).
 
-		if [[ "$m" == 'binders' ]]
-		then
-			mkdir -p $aptop/$m
-			check_default_binders $m	# not checking return
+	mkdir -p $aptop/binders
+	check_default_binders binders	# not checking return
+
+	# Do shoulders.
+
+	mkdir -p $aptop/shoulders	# yyy incomplete
+
+	# Do minters.
+	# Don't copy in anything if there's already a minter directory, but
+	# the first time seeing a new populator, we do copy in fresh defaults.
+
+	local populator dstpopulator
+	for m in $nsf/minters/*
+	do
+		populator=$( basename $m )
+		dstpopulator=$aptop/minters/$populator
+		[[ -e $dstpopulator ]] &&
 			continue
-		elif [[ -e $aptop/$m ]]
-		then
-			continue	# already there, don't need to create
-		fi
-		## if we get here, there's a missing directory
-		#read -t 30 -p \
-		#	"Server has no $m directory.  Create? [Y/n] "
-		#	# Y is default.
-		#[[ $? != 0 ]] && {
-		#	echo -e "\nError: response EOF or timeout: aborting."
-		#	exit 1
-		#}
-		#[[ $REPLY == "" || $REPLY =~ ^[yY] ]] ||
-		#	continue
-		cp -pr $nsf/$m $aptop
-		echo Initializing directory: $aptop/$m
+		echo Initializing directory: $dstpopulator
+		mkdir $dstpopulator || {
+			echo "Error: panic -- don't want to overwrite minters"
+			exit 1		# since no one checks our return status
+		}
+		cp -pr $m $aptop/minters/
 	done
 }
 

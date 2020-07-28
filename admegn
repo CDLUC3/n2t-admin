@@ -989,6 +989,45 @@ function msync {
 	#)" | admegn mload ~/sv/cur/apache2/minters
 }
 
+# sync (update) local binders to catch up with source state of remote binders
+
+function bsync {
+
+	local ruserhost=${1:-}
+	[[ ! "$ruserhost" ]] && {
+		echo "Error: no remote host specified" 1>&2
+		return 1
+	}
+#my $rwind = '^==* report window .* to \([0-9].*\)$';
+#my $changed_ids = `tlog --mods $changetime $td/logs/transaction_log \\
+#        | sed -n -e 's/^.=mod== [^ ][^ ]* //p' -e 's/$rwind/# end: \\1/p'`;
+#
+#my $report_end_time;    # in practice, a tlog parameter for next harvest
+#$changed_ids =~ s/^# end: (.*)\n// and
+#        $report_end_time = $1;
+#like $report_end_time, qr/^\d\d\d\d\.\d\d\.\d\d\_\d\d:\d\d:\d\d\.?\d*$/,
+#        "report end time captured";
+
+
+# XXX big question? can the iddump stuff run from a non-installed egg?
+#     ie, running under perl -Mblib from an eggnogALT directory?
+	#ssh $ruserhost "(
+	#	cd ~/sv/cur/apache2/eggnogALT ?
+	#	starttime=$( cat NEXT_HARVEST_START )
+	# XXX make sure log rotation is temporarily off(?)
+	#	tlog --mods $starttime $sa/logs/transaction_log \
+	#	   sed ... to filter changes and save new NEXT_HARVEST_START
+	#	   create > ezid.changed_ids
+	#	   create > oca.changed_ids
+	#	altegg iddump $sa/binders/ezid < ezid.changed_ids |
+	#		ssh xxx "(idload $sa/binders/...ezid_s_ezid
+	#	altegg iddump $sa/binders/oca < oca.changed_ids
+	#		ssh xxx "(idload $sa/binders/...oca_s_oca
+	#)"
+
+	# run this every 10 mins?
+}
+
 # these sources usually overridden during pfx validation
 #
 ShouldersFile=~/shoulders/master_shoulders.txt	# default
