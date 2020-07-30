@@ -68,8 +68,8 @@ function check_changes {
 	}
 	#hgid=$( hg identify | sed 's/ .*//' )
 	gitid=$( git show --oneline | sed 's/ .*//;q' )
-	changes=
-	[[ ! $gitid || "$gitid" =~ \+ ]] &&
+	changes=$( git diff )
+	[[ ! $gitid ]] &&
 		changes=1
 	[[ ! $changes || $force ]] &&
 		return 0
