@@ -24,7 +24,7 @@ This script supports commands that automate common N2T service admin tasks.
 
   cron stop   install cronstop file to (by default) disable all crontab jobs
   cron start  install or re-enable usual crontab jobs
-  cron works  check if a cronstop file exists; if so exit 1, else exit 0
+  cron status check if a cronstop file exists; if so exit 1, else exit 0
 
   cfq <query>  configuration query via egg with preset --home \$sa
 
@@ -501,7 +501,7 @@ ezid|oca|yamz)
 	;;
 
 cron)
-	subcmd=${1:-works}
+	subcmd=${1:-status}
 	cd $n2t_service_dir
 	if [[ "$subcmd" == start && -e cronstop ]]
 	then
@@ -517,15 +517,15 @@ cron)
 		}
 		echo "Creating blanket $n2t_service_dir/cronstop file;" \
 			"edit it to selectively re-enable services."
-	else			# assume "works" (status check)
+	else			# assume "status" (status check)
 		[[ -e cronstop ]] && {
 			echo "Crontab disabled by cronstop. Do" \
 				"\"n2t cron start\" to re-enable crontab jobs."
-			exit 1
+			exit 0
 		}
 		echo "Crontab enabled. No cronstop file exists. Do" \
 			\"n2t cron stop\" "to disable."
-		exit 0
+		exit 1
 	fi
 	make crontab
 	exit

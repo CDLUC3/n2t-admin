@@ -21,6 +21,8 @@ function usage {
 summary="
      $me warts
      $me binder_load Dbdir [ Dbdump_file ]
+     $me bsync RemoteHost
+     $me bstat [ Binder ... ]
      $me msync RemoteHost
        $me mdump [ -v ] [ Minter/nog.bdb ... ] [ > MinterStates ]
        $me mload [ -nv ] Dir [ < MinterStates ]
@@ -74,16 +76,46 @@ DESCRIPTION
        bad things might happen if you're loading a new binder that will
        be used as it is appearing, so you might want to turn off apache.
 
-       Also, you could have the dump file locally and just call
+XXX do a binder_backup_list command that lists the latest clean backup of each binder,
+
+XXX do a binder_dump command that takes a timestamped clean binder backup,
+creates a timestamped dump of it, suggests a next harvest: entry
+
+# ======== start from date of full binder db_dump
+# next harvest: 2020.08.04_02:37:01 /apps/n2t/sv/cur/apache2/logs/transaction_log
+       xxx this is awkward
+
+       Also, you could have the dump file locally and call
 
         \$ admegn binder_load \$dbdir db_dump_file
+       or
+        \$ admegn binder_load \$dbdir < db_dump_file
+
+       xxx it should restart apache afterwards, right? (why?)
+           should it disable cron during that time too?
 
        XXX needed?
        The "warts" form takes the ~/warts/env.sh bash scripts and creates a
        corresponding ~/warts/env.yaml form of its settings (in YAML format).
 
+       The "bsync" form updates the local host's binders with the binders'
+       states found on the RemoteHost (eg, n2t@ids-n2t-prd-2a.n2t.net).
+       NB: this command starts by reading the "next harvest" time (as a
+       TEMPER timestamp) at the end of the remote ~/logs/iddumper_log file,
+       reading transaction records from that time to the present, and ends by
+       writing the next harvest time back to the end of the iddumper_log file.
+       It goes to RemoteHost and runs "~/tlog/bsync2remote \$LocalHost".
+       Running it every so often (eg, once a day or once an hour) keeps
+       binders in sync. The more frequently it is run, the less work each
+       iteration takes and the sooner it completes.
+
+       The "bstat" form prints vital stats of each listed public Binder,
+       or all public binders if no args are specified. Example:
+
+            \$ $me bstat ezid
+
        The "msync" form updates the local host's minters with the minters'
-       states found on with the RemoteHost (eg, n2t@ids-n2t-prd-2a.n2t.net).
+       states found on the RemoteHost (eg, n2t@ids-n2t-prd-2a.n2t.net).
        It more or less follows the steps outlined below. Running it every so
        often (eg, once a day or once an hour) keeps minters in sync. The more
        frequently it is run, the less work each iteration takes and the
@@ -928,46 +960,69 @@ function binder_load {
 		echo "Error: no binder directory specified" 1>&2
 		return 1
 	}
-	#[[ ! "$dbdump" ]] && {
-	#	echo "Error: no binder dump specified" 1>&2
-	#	return 1
-	#}
 
-	cd $dbdir/..
-	local sbdr=$( basename $dbdir )		# short binder name
-	if [[ -e $sbdr ]]
+	# $rbdr, $obdr, and $files are relative to $dbdir/..
+	local rbdr=$( basename $dbdir )	# relative (no path) binder name
+	local obdr=old/$rbdr		# old binder name (for backup)
+	local files=(
+		$obdr/{0=egg_1.00,0=pairtree_1.02,egg.rlog}
+		$obdr/{egg_lock,egg_README,pairtree_root}
+	)
+
+	echo "ALERT: Disabling crontab. Remember to re-enable when done!"
+	n2t cron stop
+
+	if [[ -e $dbdir ]]
 	then
-		mv $sbdr OLD$sbdr
-		mkdir $sbdr
-		# copy back binder infrastructure files minus log.* and __db.*
-		#cp -p OLD$sbdr/{0=egg_1.00,0=pairtree_1.02,egg.rlog} $sbdr
-		#cp -pr OLD$sbdr/{egg_lock,egg_README,pairtree_root} $sbdr
-		local files=(
-			OLD$sbdr/{0=egg_1.00,0=pairtree_1.02,egg.rlog}
-			OLD$sbdr/{egg_lock,egg_README,pairtree_root}
+		(cd $dbdir/..	# in subshell so we get original CWD later
+			# old binder directories go here; should exist always
+			mkdir -p old	# yy should move to n2t init step
+			rm -fr $obdr	# only keep one single backup
+			mv $rbdr $obdr
+			mkdir $rbdr
+			for f in "${files[@]}"
+			do
+				[[ ! -e $f ]] &&
+					continue
+				cp -pr $f $rbdr
+			done
 		)
-		for f in "${files[@]}"
-		do
-			[[ ! -e $f ]] &&
-				continue
-			cp -pr $f $sbdr
-		done
-		#cp -pr OLD$sbdr/{egg_lock,egg_README,pairtree_root} $sbdr
 	else
-		mkdir $sbdr
+		mkdir $dbdir
+		# yyy oops, what about our egg_README, etc. files?
 	fi
 
-	cd $sbdr;
-	if [[ "$dbdump" ]]
+	# NB: make sure TMPDIR env var is other than "/"
+	local tail		# hopefully a timestamp from name in $dbdump
+	if [[ "$dbdump" ]]	# recommended, since you can have a backup date
 	then
-		local tail=$( basename $dbdump ) # hopefully timestamped name
-		date > FROM_BACKUP_$tail
-		db_load egg.bdb < $dbdump
+		tail=$( basename $dbdump )	# hopefully timestamped name
+		(cd $rbdr	# subshell so $dbdump path is from caller view
+			date > FROM_BACKUP_$tail
+			db_load egg.bdb
+		) < $dbdump
 	else
-		date > FROM_BACKUP
-		db_load egg.bdb		# from STDIN
+		tail="date_unknown"
+		(cd $rbdr
+			date > FROM_BACKUP_$tail
+			db_load egg.bdb
+		) # from STDIN
 	fi
-	# NB: make sure TMPDIR env var is other than /
+	[[ $( apache status ) =~ ^UP ]] && {
+		echo "You should probably restart apache now."
+	}
+	cat << EOT
+
+NB: To keep the loaded binder in sync with a remote binder, enter the TEMPER
+(eg, 2020.07.30_02:37:01) timestamp of the snapshot in the last two-line entry
+of the remote host's ~/logs/iddumper_log file. For this snapshot the timestamp
+appears to be "$tail". Example last two lines:
+
+# ======== start from date of full binder db_dump
+# next harvest: 2020.08.04_02:37:01 /apps/n2t/sv/cur/apache2/logs/transaction_log
+
+If apache was running during loading, you should restart it now.
+EOT
 }
 
 # sync (update) local minters to catch up with source state of remote minters
@@ -979,7 +1034,8 @@ function msync {
 		echo "Error: no remote host specified" 1>&2
 		return 1
 	}
-	ssh $ruserhost "(
+	echo "# ---- $me msync:" $( date '+%Y.%m.%d_%H:%M:%S' ) "----"
+	ssh -n $ruserhost "(
 		cd ~/sv/cur/apache2
 		for p in ezid oca yamz snac
 		do
@@ -990,6 +1046,7 @@ function msync {
 }
 
 # sync (update) local binders to catch up with source state of remote binders
+# run this every 10 mins?
 
 function bsync {
 
@@ -998,34 +1055,29 @@ function bsync {
 		echo "Error: no remote host specified" 1>&2
 		return 1
 	}
-#my $rwind = '^==* report window .* to \([0-9].*\)$';
-#my $changed_ids = `tlog --mods $changetime $td/logs/transaction_log \\
-#        | sed -n -e 's/^.=mod== [^ ][^ ]* //p' -e 's/$rwind/# end: \\1/p'`;
-#
-#my $report_end_time;    # in practice, a tlog parameter for next harvest
-#$changed_ids =~ s/^# end: (.*)\n// and
-#        $report_end_time = $1;
-#like $report_end_time, qr/^\d\d\d\d\.\d\d\.\d\d\_\d\d:\d\d:\d\d\.?\d*$/,
-#        "report end time captured";
+	localhost+=$( hostname -f )
+	echo "# ---- $me bsync:" $( date '+%Y.%m.%d_%H:%M:%S' ) "----"
+	echo "# running ssh -n $ruserhost 'tlog/bsync2remote n2t@$localhost'"
+	ssh -n $ruserhost "tlog/bsync2remote n2t@$localhost"
 
+	# XXX kludge -- make this work for all binders
+	echo "#   after bsync EZID" "$( admegn bstat ezid | grep bindings )"
+	echo "#   after bsync OCA " "$( admegn bstat oca  | grep bindings )"
 
-# XXX big question? can the iddump stuff run from a non-installed egg?
-#     ie, running under perl -Mblib from an eggnogALT directory?
-	#ssh $ruserhost "(
-	#	cd ~/sv/cur/apache2/eggnogALT ?
-	#	starttime=$( cat NEXT_HARVEST_START )
-	# XXX make sure log rotation is temporarily off(?)
-	#	tlog --mods $starttime $sa/logs/transaction_log \
-	#	   sed ... to filter changes and save new NEXT_HARVEST_START
-	#	   create > ezid.changed_ids
-	#	   create > oca.changed_ids
-	#	altegg iddump $sa/binders/ezid < ezid.changed_ids |
-	#		ssh xxx "(idload $sa/binders/...ezid_s_ezid
-	#	altegg iddump $sa/binders/oca < oca.changed_ids
-	#		ssh xxx "(idload $sa/binders/...oca_s_oca
-	#)"
+}
 
-	# run this every 10 mins?
+# show vital stats
+
+function bstat {
+
+	[[ ${#*} -eq 0 ]] && {
+		echo All binders -- not implemented
+		exit 1
+	}
+	for b in $@
+	do
+		n2t $b mstat
+	done
 }
 
 # these sources usually overridden during pfx validation
@@ -2111,6 +2163,14 @@ binder_load)
 	;;
 msync)
 	msync $@
+	exit
+	;;
+bsync)
+	bsync $@
+	exit
+	;;
+bstat)
+	bstat "$@"
 	exit
 	;;
 mdump)
