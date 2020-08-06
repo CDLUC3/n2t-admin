@@ -997,13 +997,13 @@ function binder_load {
 	if [[ "$dbdump" ]]	# recommended, since you can have a backup date
 	then
 		tail=$( basename $dbdump )	# hopefully timestamped name
-		(cd $rbdr	# subshell so $dbdump path is from caller view
+		(cd $dbdir	# subshell so $dbdump path is from caller view
 			date > FROM_BACKUP_$tail
 			db_load egg.bdb
 		) < $dbdump
 	else
 		tail="date_unknown"
-		(cd $rbdr
+		(cd $dbdir
 			date > FROM_BACKUP_$tail
 			db_load egg.bdb
 		) # from STDIN
@@ -1021,7 +1021,7 @@ appears to be "$tail". Example last two lines:
 # ======== start from date of full binder db_dump
 # next harvest: 2020.08.04_02:37:01 /apps/n2t/sv/cur/apache2/logs/transaction_log
 
-If apache was running during loading, you should restart it now.
+** If apache was running during loading, you should do "apache restart" now. **
 EOT
 }
 
@@ -1042,7 +1042,6 @@ function msync {
 			admegn mdump minters/\$p/ark/?????/*/nog.bdb
 		done
 	)" | admegn mload $apminters
-	#)" | admegn mload ~/sv/cur/apache2/minters
 }
 
 # sync (update) local binders to catch up with source state of remote binders
@@ -1061,8 +1060,9 @@ function bsync {
 	ssh -n $ruserhost "tlog/bsync2remote n2t@$localhost"
 
 	# XXX kludge -- make this work for all binders
-	echo "#   after bsync EZID" "$( admegn bstat ezid | grep bindings )"
-	echo "#   after bsync OCA " "$( admegn bstat oca  | grep bindings )"
+	echo "#    after bsync EZID" "$( admegn bstat ezid | grep bindings )"
+	echo "#    after bsync OCA " "$( admegn bstat oca  | grep bindings )"
+	echo
 
 }
 
