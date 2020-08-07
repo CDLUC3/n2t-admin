@@ -14,9 +14,9 @@ MAILTO = 'jak@ucop.edu'
 # XXX XXX XXX temp! bsync every 4 hours, and 3 minutes before backup
 # XXX what about sunday rotation?
 # bsync
-34 2,6,10,14,18,22 * * * bash -lc "admegn bsync n2t@ids-n2t-prd-2a.n2t.net >> n2t_create/bsyncout 2>&1"
+# 34 2,6,10,14,18,22 * * * bash -lc "admegn bsync n2t@ids-n2t-prd-2a.n2t.net >> n2t_create/bsyncout 2>&1"
 # msync
-30 2,6,10,14,18,22 * * * bash -lc "admegn msync n2t@ids-n2t-prd-2a.n2t.net >> n2t_create/msyncout 2>&1"
+# 30 2,6,10,14,18,22 * * * bash -lc "admegn msync n2t@ids-n2t-prd-2a.n2t.net >> n2t_create/msyncout 2>&1"
 
 # Update OS automatically on schedule determined by patch_* setting in
 # /apps/n2t/sv/cur/apache2/eggnog_conf and queried by "egg cfq patch_today".

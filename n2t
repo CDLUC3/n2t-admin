@@ -22,9 +22,9 @@ This script supports commands that automate common N2T service admin tasks.
   checkpoint  XXX mark rollback point (to be run before "hg update")
   checkpoint  XXX mark rollback point (to be run before "git checkout")
 
-  cron stop   install cronstop file to (by default) disable all crontab jobs
-  cron start  install or re-enable usual crontab jobs
-  cron status check if a cronstop file exists; if so exit 1, else exit 0
+  cron off    install cronstop file to (by default) disable all crontab jobs
+  cron on     install or re-enable usual crontab jobs
+  cron check  check if a cronstop file exists; if so exit 1, else exit 0
 
   cfq <query>  configuration query via egg with preset --home \$sa
 
@@ -501,15 +501,15 @@ ezid|oca|yamz)
 	;;
 
 cron)
-	subcmd=${1:-status}
+	subcmd=${1:-check}
 	cd $n2t_service_dir
-	if [[ "$subcmd" == start && -e cronstop ]]
+	if [[ "$subcmd" == on && -e cronstop ]]
 	then
 		rm cronstop || {
 			echo Problem removing $n2t_service_dir/cronstop file
 			exit 1
 		}
-	elif [[ "$subcmd" == stop && ! -e cronstop ]]
+	elif [[ "$subcmd" == off && ! -e cronstop ]]
 	then
 		crontab -l | sed 's/^/#/' > cronstop || {
 			echo Problem creating cronstop file in $n2t_service_dir
@@ -517,14 +517,14 @@ cron)
 		}
 		echo "Creating blanket $n2t_service_dir/cronstop file;" \
 			"edit it to selectively re-enable services."
-	else			# assume "status" (status check)
+	else			# assume "check" (status check)
 		[[ -e cronstop ]] && {
 			echo "Crontab disabled by cronstop. Do" \
-				"\"n2t cron start\" to re-enable crontab jobs."
+				"\"n2t cron on\" to re-enable."
 			exit 0
 		}
 		echo "Crontab enabled. No cronstop file exists. Do" \
-			\"n2t cron stop\" "to disable."
+			\"n2t cron off\" "to disable."
 		exit 1
 	fi
 	make crontab
