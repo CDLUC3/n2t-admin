@@ -15,25 +15,25 @@ DESCRIPTION
 
 This script supports commands that automate common N2T service admin tasks.
 
-  import      bring in and TEST the latest code base in the repo
-  rollout     stop public-facing server, install new code, restart server
-  test        test code installed in currently running public-facing server
-  rollback    back out of the last rollout, reverting to the prior rollout
-  checkpoint  XXX mark rollback point (to be run before "hg update")
-  checkpoint  XXX mark rollback point (to be run before "git checkout")
+  import       bring in and TEST the latest code base in the repo
+  rollout      stop public-facing server, install new code, restart server
+  test         test code installed in currently running public-facing server
+  rollback     back out of the last rollout, reverting to the prior rollout
+  checkpoint   XXX mark rollback point (to be run before "hg update")
+  checkpoint   XXX mark rollback point (to be run before "git checkout")
 
-  cron off    install cronstop file to (by default) disable all crontab jobs
-  cron on     install or re-enable usual crontab jobs
-  cron check  check if a cronstop file exists; if so exit 1, else exit 0
+  cron off     install cronstop file to (by default) disable all crontab jobs
+  cron on      install or re-enable usual crontab jobs
+  cron check   check if a cronstop file exists; if so exit 1, else exit 0
 
   cfq <query>  configuration query via egg with preset --home \$sa
 
-  ezid <args>  run egg command <args> on public ezid binder
-  oca  <args>  run egg command <args> on public oca binder
-  yamz <args>  run egg command <args> on public yamz binder
+  ezid <args>  run "egg <args>" with options to select public ezid binder
+  oca  <args>  run "egg <args>" with options to select public oca  binder
+  yamz <args>  run "egg <args>" with options to select public yamz binder
 
-The first three commands above reflect the normal sequence.  Use "rollback"
-only if "test" failed.  Use "checkpoint" if you're not using "import".
+The first three commands above reflect the normal sequence. Use "rollback"
+only if "test" failed. Use "checkpoint" if you're not using "import".
 
 NB: The first time you ever run this script on a new system, you need to
 "prime the pump".  The script assumes you are working under "svu cur",
