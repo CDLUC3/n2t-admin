@@ -182,7 +182,7 @@ basicfiles:
 
 BASICDIRS=$(LBIN) $(HOME)/warts $(HOME)/warts/ssl $(HOME)/ssl \
 	$(HOME)/.ssh $(HOME)/logs $(HOME)/init.d $(HOME)/backups \
-	$(HOME)/minters $(HOME)/binders $(HOME)/batches
+	$(HOME)/minters $(HOME)/binders $(HOME)/naans $(HOME)/batches
 
 basicdirs: $(BASICDIRS)
 
@@ -194,7 +194,7 @@ basicdirs: $(BASICDIRS)
 	#	ln -s $(HOME)/../n2tbackup/backups $(HOME)/backups; \
 	#fi
 
-$(HOME)/backups:
+$(HOME)/backups $(HOME)/naans:
 	mkdir -p $@
 
 $(LBIN) $(HOME)/warts $(HOME)/warts/ssl $(HOME)/init.d $(HOME)/batches:
