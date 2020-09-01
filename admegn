@@ -1816,8 +1816,12 @@ function backup {
 	echo Backing up shoulders and transaction_log to $dst.
 	mkdir $dst
 	#cp -Lpr ~/shoulders/* ~/sv/cur/apache2/logs/transaction_log.rlog $dst
-	cp -Lpr ~/sv/cur/apache2/logs/transaction_log.rlog $dst
+	cp -Lpr ~/sv/cur/apache2/logs/transaction_log $dst
+	[[ -e ~/naans ]] && {
+		cp -Lpr ~/naans/{main_naans,candidate_naans,shoulder_registry} $dst
+	}
 	# xxx ouch, these are big logs, getting backed up with shoulders
+	# xxx not actually backing up shoulders
 
 	dst=~/backups/prefixes/$now
 	echo Backing up prefixes to $dst.
@@ -1882,7 +1886,7 @@ function backup {
 			echo "$msg"
 			mail -s "$b binder backup (removed) failed db_verify" \
 				$notify <<< "$msg"
-			rm -fr $dst/..		# toss -- backup not useful
+			rm -fr $(dirname $dst)	# toss -- backup not useful
 			continue		# don't fall through
 		}
 

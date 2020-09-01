@@ -256,10 +256,10 @@ function arkit_init {
 	#local ifs_saved="$IFS"
 	# yyy should probably untaint $Meta and $Subjects
 	# IFS set for duration of extended (cont. lines) command
-	IFS='|' \
-		read -a erc <<< $Meta; \
-		read -a keywords <<< $Subjects \
-	; # IFS value restored at end of command
+	IFS='|'    read -a erc <<< $Meta
+	IFS='|'	   read -a keywords <<< $Subjects
+	# IFS value restored at end of command
+
 	#IFS="$ifs_saved"
 	local who=${erc[0]:-'(:unav)'}
 	local what=${erc[1]:-'(:unav)'}
@@ -325,6 +325,7 @@ EOT
 	then
 		echo $noexec ezcl p "$ezcreds" view $ark
 	else
+		echo ezcl view $ark
 		ezcl p "$ezcreds" view $ark | sed 's/^/    /'
 	fi
 
@@ -376,18 +377,23 @@ EOT
 		overall_metadata+="--metadata=\"subject:$keyword\""$'\n'
 	done
 	overall_metadata+="# === end overall object metadata"$'\n'
+	local mdata
+	mdata=$( perl -ne '/^\s*#/ or print' <<< "$overall_metadata" )
+	echo overall_metadata: "$mdata"
 
 	local ia_mdata_args=
-	IFS=$'\n' read -d '' -a ia_mdata_args \
-		<<< "$( perl -ne '/^\s*#/ or print' <<< $overall_metadata )"
+	IFS=$'\n' read -d '' -a ia_mdata_args <<< "$mdata"
 	# IFS will have reverted after one-time change
-	echo $noexec "Uploading stub object $ark ($iaid):"
+	echo prepping eval "py_ia upload $iaid $File ${ia_mdata_args[@]}"
 
+	echo $noexec "Uploading stub object $ark ($iaid):"
 	if [[ "$noexec" ]]
 	then
 		echo $noexec eval "py_ia upload $iaid $File ${ia_mdata_args[@]}"
 		#showargs eval "py_ia upload $iaid $File ${ia_mdata_args[@]}"
 	else
+# XXX it seems to keep failing at this step, and then you have to do this step
+# by hand by cutting and pasting the block at the end of this script. arggh
 		# eval plus array-based metadata args -- a delicate quote-based
 		# solution painfully arrived at by trial and error
 		# yyy maybe these quoting problems should be avoided by
@@ -405,6 +411,9 @@ EOT
 			return 1
 	}
 	echo XXX should automatically run addversion now
+	echo
+	echo "NB: When ready, set status to 'public' with"
+	echo '  ezcl p "admin:$(wegnpw ezidadmin)"' update $ark _status public
 	#arkit_addversion
 	return
 }
@@ -468,6 +477,22 @@ exit
 #xxx add this for each snapshot!
 #   --metadata="bestest:https://n2t.net/$n2t_item" \
 
+item=ark:/13030/c7wd3q16m
+file=future_proofing_web_2005_Sept.pdf
+
+py_ia upload "$item" "filename.v$version" \
+  --metadata="creator:$who"
+  --metadata="title:$what"
+  --metadata="date:$when"
+  --metadata="publisher:$publisher"
+  --metadata="identifier:https://$resolver/$ark"
+  --metadata="identifier-ark:https://$resolver/$ark"
+  --metadata="iaid:$iaid"
+  --metadata="licenseurl:$cc0url"
+  --metadata="bestest:https://$resolver/$ark"
+  --metadata="landing:$landing"
+  --metadata="plunging:$redirect"
+  --metadata="highest_version:0"
 
 py_ia upload "$item" "filename.v$version" \
    --metadata="collection:luck" \
