@@ -18,6 +18,8 @@ This script supports commands that automate common N2T service admin tasks.
   import       bring in and TEST the latest code base in the repo
   rollout      stop public-facing server, install new code, restart server
   test         test code installed in currently running public-facing server
+  rolltest     same as "n2t rollout && n2t test", observing --force setting
+
   rollback     back out of the last rollout, reverting to the prior rollout
   checkpoint   XXX mark rollback point (to be run before "hg update")
   checkpoint   XXX mark rollback point (to be run before "git checkout")
@@ -379,6 +381,14 @@ import)
 	}
 	n2t_checkpoint
 	n2t_import
+	exit
+	;;
+
+rolltest)				# simple shorthand
+	opt=
+	[[ "$force" ]] &&
+		opt='--force'
+	n2t $opt rollout && n2t test
 	exit
 	;;
 

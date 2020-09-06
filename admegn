@@ -1,14 +1,5 @@
 #!/bin/bash
 
-## defined service/deployment classes and hostnames
-#classfmt="CLASS CANONICAL_NAME OTHER_NAMES ..."
-#hostclass=(
-#    -dev    n2t-dev.n2t.net ids-n2t-dev.n2t.net
-#    -stg    n2t-stg.n2t.net ids-n2t-stg-2{a,b,c}.n2t.net
-#    -prd    n2t.net ids-n2t-prd-2{a,b,c}.n2t.net
-#    -mac    jak-macbook.local
-#)
-
 # xxx do a system version of this, eg, EGNAPA_NOTIFY?
 notify=jak@ucop.edu	# xxx backup, sysupdate, or other failure
 
@@ -81,8 +72,6 @@ XXX do a binder_backup_list command that lists the latest clean backup of each b
 XXX do a binder_dump command that takes a timestamped clean binder backup,
 creates a timestamped dump of it, suggests a next harvest: entry
 
-# ======== start from date of full binder db_dump
-# next harvest: 2020.08.04_02:37:01 /apps/n2t/sv/cur/apache2/logs/transaction_log
        xxx this is awkward
 
        Also, you could have the dump file locally and call
@@ -116,10 +105,10 @@ creates a timestamped dump of it, suggests a next harvest: entry
 
        The "msync" form updates the local host's minters with the minters'
        states found on the RemoteHost (eg, n2t@ids-n2t-prd-2a.n2t.net).
-       It more or less follows the steps outlined below. Running it every so
-       often (eg, once a day or once an hour) keeps minters in sync. The more
-       frequently it is run, the less work each iteration takes and the
-       sooner it completes.
+       It more or less follows the steps outlined below for mdump and mload.
+       Running it every so often (eg, once a day or once an hour) keeps
+       minters in sync. The more frequently it is run, the less work each
+       iteration takes and the sooner it completes.
 
        The "mdump" form writes minter states in ANVL format to stdout.
        If no minters are specified, it looks for minters in a "minters"
@@ -221,23 +210,14 @@ creates a timestamped dump of it, suggests a next harvest: entry
        via crontab.
 
 EXAMPLES
-       These commands could be used to migrate all the minters from one
-       system to another.
+       This command could be used to synchronize all the minters on the
+       given remote system to the local system.
 
-            \$ $me mdump > local_state
-            \$ ssh n2t@ids-n2t-prd-2a.n2t.net < local_state \\
-                  "$me mload ~/sv/cur/apache2/minters; $me mdump" \\
-                        > remote_state
-            \$ diff local_state remote_state
-
-       This command reboots a host with a server on port 18880.
-       yyy bug? this requires port 18880 to be open
-
-            \$ $me bootwatch ids-n2t-prd-2a.n2t.net:18880
+            \$ $me msync n2t@ids-n2t-prd-2a.n2t.net
 
        This command reboots a remote server behind a load balancer.
 
-	    \$ $me bootwatch ids-n2t-prd-2a.n2t.net n2t.net
+	    \$ $me bootwatch ids-n2t2-prd.n2t.net n2t.net
 
 
 SUMMARY $summary
