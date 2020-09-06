@@ -152,10 +152,12 @@ template=eedk
 #
 cmd="nog -p $mpath mkminter --type rand --atlast add3 $naan/$shdr $template"
 echo $cmd
-[[ "$verbose" ]] && {
-	echo date: $( date '+%Y.%m.%d' )
-	echo minter: $minter_url
-}
+echo when: $( date '+%Y.%m.%d' )
+echo minter: $minter_url
+#[[ "$verbose" ]] && {
+#	echo date: $( date '+%Y.%m.%d' )
+#	echo minter: $minter_url
+#}
 [[ "$no_exec" ]] && exit 0
 $cmd
 #nog -p $pmdir/ark mkminter --type rand --atlast add3 $naan/$shdr $template
