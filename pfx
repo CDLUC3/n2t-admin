@@ -2230,6 +2230,7 @@ function pfx_test_rollout_n2t_test {
 	echo "+==== trnt: diffs in $diffsfile"
 	local output statsline
 # xxx pfx_<verb>?
+	# pfx test call build_server_tree? yyy
 	output=$( pfx test 2>&1 ) || {
 		echo "$output"
 		echo "+==== Error: trnt: pfx test failed"
@@ -2257,6 +2258,8 @@ function pfx_test_rollout_n2t_test {
 }
 
 function pfx_save {
+	[[ "$PFX_TEST" ]] &&		# no-op if called via "pfx test"
+		return 0		# and build_server_tree
 	local w=${1:-}			# top of web server
 	[[ "$w" && -d "$w" ]] || {
 		echo "Error: no web server at $w" 1>&2
@@ -2274,7 +2277,10 @@ function pfx_save {
 	return
 }
 
+# called by build_server_tree; never restores to live public server
 function pfx_restore {
+	[[ "$PFX_TEST" ]] &&		# no-op if called via "pfx test"
+		return 0		# and build_server_tree
 	local w=${1:-}			# top of web server
 	[[ "$w" && -d "$w" ]] || {
 		echo "Error: no web server at $w" 1>&2
@@ -2661,7 +2667,8 @@ test)
 	echo "$me process running now in $pfx_test directory"
 	# remove temp dir to force re-build and clear $tested_ok_file
 	rm -fr td_egnapa
-	perl -CS -Mblib t/z_egg_prefixes_n2t.t
+	# PFX_TEST=1 makes pfx save/restore quiet about missing files
+	PFX_TEST=1 perl -CS -Mblib t/z_egg_prefixes_n2t.t
 	exit
 	;;
 tested_ok)

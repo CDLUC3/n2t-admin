@@ -1604,7 +1604,6 @@ function backup_rotate {
 		#	continue	# test binder -- skip
 		#[[ ! -e $apbinders/$( basename $bbk )/egg.bdb ]] &&
 		#	continue	# not a binder -- skip
-echo XXX running splus $bbk 14 $day7th ...
 		# keep 14 dailies, 4 weeklies, 4 monthlies
 		splus	$bbk           14 	$day7th \
 		        $bbk/weeklies   4  	$day28th \
