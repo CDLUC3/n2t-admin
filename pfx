@@ -2258,7 +2258,7 @@ function pfx_test_rollout_n2t_test {
 }
 
 function pfx_save {
-	[[ "$PFX_TEST" ]] &&		# no-op if called via "pfx test"
+	[[ "${PFX_TEST:-}" ]] &&		# no-op if called via "pfx test"
 		return 0		# and build_server_tree
 	local w=${1:-}			# top of web server
 	[[ "$w" && -d "$w" ]] || {
@@ -2279,7 +2279,7 @@ function pfx_save {
 
 # called by build_server_tree; never restores to live public server
 function pfx_restore {
-	[[ "$PFX_TEST" ]] &&		# no-op if called via "pfx test"
+	[[ "${PFX_TEST:-}" ]] &&		# no-op if called via "pfx test"
 		return 0		# and build_server_tree
 	local w=${1:-}			# top of web server
 	[[ "$w" && -d "$w" ]] || {
