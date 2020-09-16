@@ -350,6 +350,8 @@ function wegn_cmd {
 			loc=$( grep 'Location: http' <<< "$terrs" )
 			echo "$out"
 		else
+			# yyy wget problem? can't get full headers with
+			#     --max-redirects 0; will start using curl instead
 			#loc=$(sed -n '/Location: http/s/ .following.//p' $terrs)
 			loc=$(sed -n '/Location: http/s/ .following.//p' \
 				<<< "$terrs")
