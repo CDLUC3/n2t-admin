@@ -33,6 +33,7 @@ This script supports commands that automate common N2T service admin tasks.
   ezid <args>  run "egg <args>" with options to select public ezid binder
   oca  <args>  run "egg <args>" with options to select public oca  binder
   yamz <args>  run "egg <args>" with options to select public yamz binder
+  ...  <args>  similar for "ncpt", "idra", "pfx" binders
 
 The first three commands above reflect the normal sequence. Use "rollback"
 only if "test" failed. Use "checkpoint" if you're not using "import".
@@ -504,7 +505,7 @@ cfq)
 	exit
 	;;
 
-ezid|oca|yamz)
+ezid|oca|yamz|ncpt|idra|pfx)
 	perl -Mblib egg -d $aptop/binders/$Command --user $Command \
 		--isolator public "$@"
 	exit
