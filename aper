@@ -1,0 +1,40 @@
+#!/bin/bash
+
+function aper_do {
+	local n=10
+	[[ "${1:-}" =~ ^-.* ]] && {
+		n=${1#-}	# delete initial '-'
+		shift
+	}
+	local dir=${1:-./td_egnapa}
+	local f=$( mrm $dir/logs/error_log )
+	ls -l $f
+	#echo "tail -$n $f | more"
+	#tail -$n $f | more
+	#tail -$n $f | perl -ne 'print if /./' | tail 
+	tail -$n $f | perl -ne 'print if / AH\d+: /'
+}
+
+function aper {
+	arg1=${1:-}
+	[[ "$arg1" =~ -*h ]] && {
+		echo "
+Usage: aper [ -h ] [ -N ] [ Dir ]
+
+The APache ERor (aper) script prints the last N hundred (default 10 hundred,
+ie, 1000) filtered messages from the most recently modified Apache error_log*
+file found in the directory Dir/logs. Messages are filtered for those matching
+/ AH\\d+: /, in order to avoid the copious rewritelog messages. Dir defaults to
+./td_egnapa.
+
+Examples:
+
+        $ aper -20
+	$ aper \$sa
+"
+		exit
+	}
+	aper_do "$arg"
+}
+
+aper "$@"

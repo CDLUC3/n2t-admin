@@ -14,7 +14,8 @@ LOGS=$(HOME)/sv/cur/apache2/logs
 TMP=/tmp/n2t_create
 # removed recently: $(HOME)/init.d/apache 
 UTILITIES=$(LBIN)/n2t $(LBIN)/wegn $(LBIN)/wegnpw $(LBIN)/admegn \
-	$(LBIN)/logwhich $(LBIN)/logwatch $(LBIN)/bdbkeys $(LBIN)/mrm \
+	$(LBIN)/logwhich $(LBIN)/logwatch $(LBIN)/bdbkeys \
+		$(LBIN)/mrm $(LBIN)/aper \
 		$(LBIN)/ezcl $(LBIN)/ia $(LBIN)/ezmdsadmin \
 		$(LBIN)/pfx $(LBIN)/mg $(LBIN)/showargs \
 		$(LBIN)/make_shdr $(LBIN)/shdr_exists $(LBIN)/make_ezacct \
