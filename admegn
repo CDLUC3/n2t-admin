@@ -215,7 +215,7 @@ EXAMPLES
 
             \$ $me msync n2t@ids-n2t-prd-2a.n2t.net
 
-       This command reboots a remote server behind a load balancer.
+       This command reboots a remote ssh host while monitoring its server.
 
 	    \$ $me bootwatch ids-n2t2-prd.n2t.net n2t.net
 
