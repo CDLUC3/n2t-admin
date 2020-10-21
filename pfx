@@ -251,6 +251,7 @@ ebi_outfile=ebi.anvl
 #naanFile=naan_registry.txt
 naanFile=master_naans
 naanURL=http://n2t.net/e/$naanFile
+shnaanshFile=shoulder_registry.txt	# shared naan shoulder file
 shdrFile=master_shoulders.txt
 shdrURL=https://n2t.net/e/pop/ezid/$shdrFile
 pfxcomsFile=lsregistry.yml
@@ -362,6 +363,7 @@ pfx_base=pfx_base.yaml				# yyy should be pfx_base.yaml
 pfx_sources=(					# yyy normalized names
 	master_naans
 	master_shoulders.txt 
+	shoulder_registry.txt			# shared naan shoulder file
 	ebireg.xml
 	ebinewreg.json
 	prefixcc.json 
@@ -372,12 +374,8 @@ pfx_sources=(					# yyy normalized names
 # Recall lthat the current service version is in environment variable $sv
 source_base_prefixes=build/eggnog/t/n2t/$pfx_base
 master_base_prefixes=$sv/$source_base_prefixes
-#master_base_prefixes=sv/cur/$source_base_prefixes
 
-#published=~/sv/cur/apache2/htdocs/e/pub
-#ark_published=~/sv/cur/apache2/htdocs/e/arks.org
 published=$sv/apache2/htdocs/e/pub
-ark_published=$sv/apache2/htdocs/e/arks.org
 
 # first check for errors in harvested sources; if none move out of
 # quarantine; if there's an error in a quarantined file, it stays
@@ -434,18 +432,16 @@ function pfx_mark4refresh {
 }
 
 # "publish" various prefix components via the current server
+# XXX is this used anywhere?
 
 function pfx_publish {
 
-	mkdir -p $published $ark_published
+	mkdir -p $published
 	local comp=${1:-}
 	case $comp in
 	naans)		# not really harvested, this completes the components
 		# yyy source path change from shoulders/naans to just naans
 		cp -p ~/shoulders/naans/master_naans $published
-		# yyy who should update $ark_published ?
-		cp -p ~/shoulders/naans/master_naans \
-			$ark_published/naan_registry.txt
 		;;
 	shoulders)
 		cp -p ~/shoulders/master_shoulders.txt $published
@@ -481,6 +477,9 @@ EOT
 # host-specific directory, $pfx_harvest, which serves as a kind of cache
 # for pfx_import. Where possible, we use scp -p to preserve mod times.
 # yyy In the process, filenames are normalized to internal conventions.
+
+# yyy can't quite decide whether to do pure "pull" (harvest) or "push", so
+# right now we're doing both for naan_registry.txt and shoulder_registry.txt
 
 function pfx_harvest {
 
@@ -530,7 +529,7 @@ function pfx_harvest {
 	local rfile
 	local maint_service=https://n2t.net/e/pub
 	# yyy adding naan_table.txt to make it easy to grep for NAANs
-	for rfile in naan_registry.txt master_shoulders.txt lsregistry.yml naan_table.txt
+	for rfile in naan_registry.txt shoulder_registry.txt master_shoulders.txt lsregistry.yml naan_table.txt
 	do
 		wget -q -O $pfx_quarantine/$rfile $maint_service/$rfile || {
 			echo "Error running wget -q -O $pfx_quarantine/$rfile" \
@@ -538,7 +537,7 @@ function pfx_harvest {
 			return 1
 		}
 	done
-	# kludge!
+	# kludge to rename!
 	mv $pfx_quarantine/{naan_registry.txt,master_naans}	# yyy kludge!
 
 	# by default, dns, connect, and read timeouts are 900 secs (15 mins)
@@ -1454,10 +1453,51 @@ EOT
 
 function pfx_stage_shoulders {
 
+	# yyy kludge
 	# Shoulders file should already be close to the right format
 	cp $shdrFile shoulders.anvl
 	echo '' >> shoulders.anvl	# make sure it ends in a blank line
 }
+
+function pfx_stage_shnaansh {
+
+	# yyy kludge
+	# Massage to the right format
+	# For any record starting "naa:" convert to ::-style ANVL header
+	# remove minter: line (privacy) and what: line (DRY)
+	#	if (/^naa:.*\n.*\nwhat:\s*(.*)\n/m) {
+	perl -00 -nE '
+		if (/^naa:.*\n.*\nwhat:\s*(.*)\n/) {
+			my $shdr = $1;
+			s/^naa:/:: $shdr\ntype: shoulder/;
+			s/^who:\s*/name: /m;
+			s/^when:\s*/date: /m;
+			s/^how:\s*/how: /m;
+			s|^where:\s*(.*)|redirect: $1/ark:\$id|m;
+			s/^what:.*\n//m;
+			print;
+		}' \
+	< $shnaanshFile > shnaansh.anvl
+	echo '' >> shnaansh.anvl	# make sure it ends in a blank line
+}
+
+# Source format
+# naa:
+# who:    INCIPIT test
+# what:   ark:/99999/fk3
+# when:   2020.06.04
+# where:  https://www.hesge.ch/heg
+# how:    NP | (:unkn) unknown | 2020 |
+
+# Target format
+# :: ark:/81983/s9
+# type: shoulder
+# manager: ezid
+# #eziduser: ucsf-archives
+# name: UCSF Archives & Special Collections
+# date: 2019.05.16
+# minter: https://n2t.net/a/ezid/m/ark/81983/s9
+# redirect: ...${id}
 
 function pfx_stage_pfxcoms {
 
@@ -1500,6 +1540,13 @@ function pfx_validate {
 		pfx_stage_naans $naanFile || return 1
 		# are we Validating converted $naanFile?
 
+	echo - Validating shared NAAN shoulders: $shnaanshFile
+		echo "    assuming pre-validated: $pfx_build/$shnaanshFile"
+		echo - Staging $shnaanshFile, creating shnaansh.anvl
+			pfx_stage_shnaansh $shnaanshFile || return 1
+	Nshnaansh=$( grep -c '^type: shoulder' $pfx_build/shnaansh.anvl )
+	# note: these shoulder files are assembled with other in pfx_combine
+
 	echo - Validating $shdrFile
 		echo "    assuming pre-validated: $pfx_build/$shdrFile"
 		#(cd ~/shoulders
@@ -1536,8 +1583,8 @@ function pfx_validate {
 	echo "$s"
 	#echo Npxc=$Npxc
 
-	echo "+==== STATS (NAANs shoulders EBIs PXCs):" \
-			 $Nnaans $Nshoulders $Nebi $Npxc
+	echo "+==== STATS (NAANs Shnaanshoulders EZIDshoulders EBIs PXCs):" \
+			 $Nnaans $Nshnaansh $Nshoulders $Nebi $Npxc
 
 	return 0
 }
@@ -1641,7 +1688,7 @@ EOT
 	# First arg is $n2tadds to weed out keys that it will override.
 	#expand {naans,shoulders,ebi,pfxcoms}.anvl > expanded
 	#perl -e "$perl_anvl2yaml" $n2tadds < expanded >> $mainout
-	expand {naans,shoulders,ebi,pfxcoms}.anvl |
+	expand {naans,shnaansh,shoulders,ebi,pfxcoms}.anvl |
 #		iconv -f ISO-8859-1 -t UTF-8 2>&1 |
 		perl -CS -e "$perl_anvl2yaml" $n2tadds >> $mainout
 	# yyy use ${LINENO}?
