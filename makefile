@@ -43,67 +43,54 @@ utilities: $(UTILITIES)
 $(UTILITIES): $(LBIN)/%: %
 	cp -p $< $(LBIN)
 
-#quicklinks: $(QLINKS) $(QLOGLINKS)
-##
-##@[[ -L $(HOME)/$$(basename $@) ]] || ln -s $@ $(HOME)
-##$(HOME)/logs/access_log : %
-##	ln -s ~/sv/cur/apache2/logs/$@ ~
-##
-#$(QLINKS):
-#	ln -s $@ $(HOME)
-#
-##[[ -L $(HOME)/logs/$$(basename $@) ]] || ln -s $@ $(HOME)/logs
-#$(QLOGLINKS):
-#	date
-
 svu: $(LBIN)/svu_run $(HOME)/sv
+
+# yyy this making of env.sh likely obsolete!
+# See ec2_bootmake for contents of this file.
 
 hostname: $(HOME)/warts/env.sh
 
-
-# XXX this making of env.sh likely obsolete! see ec2_bootmake
-
 $(HOME)/warts/env.sh:
-	@echo -e > $@ \
-"#!/bin/sh\n\
-\n\
-# This file is initialized by n2t_create/makefile. Changes to it\n\
-# only take effect upon "n2t rollout" (not "apache restart").\n\
-# This shell script sets some instance-specific environment variables\n\
-# that the build_server_tree script (in the eggnog source) reads for\n\
-# host and certificate configuration.\n\
-#\n\
-# Use EGNAPA_SSL_CERTFILE for the full path of a signed certificate,\n\
-# if any, and similarly for EGNAPA_SSL_KEYFILE and EGNAPA_SSL_CHAINFILE.\n\
-#\n\
-#"
-	@read -t 60 -p "HOSTNAME (default $(HOST)): " && echo -e >> $@ \
-"export EGNAPA_HOST=$${REPLY:-$(HOST)}\n\
-#export EGNAPA_HOST_CLASS=$${EGNAPA_HOST_CLASS:-mac}              # eg, one of dev, stg, prd, loc\n\
-\n\
-export EGNAPA_SSL_CERTFILE=\n\
-export EGNAPA_SSL_KEYFILE=\n\
-export EGNAPA_SSL_CHAINFILE=\n\
-"
+	true
 
+#$(HOME)/warts/env.sh:
+#	@echo -e > $@ \
+#"#!/bin/sh\n\
+#\n\
+## This file is initialized by n2t_create/makefile. Changes to it\n\
+## only take effect upon "n2t rollout" (not "apache restart").\n\
+## This shell script sets some instance-specific environment variables\n\
+## that the build_server_tree script (in the eggnog source) reads for\n\
+## host and certificate configuration.\n\
+##\n\
+## Use EGNAPA_SSL_CERTFILE for the full path of a signed certificate,\n\
+## if any, and similarly for EGNAPA_SSL_KEYFILE and EGNAPA_SSL_CHAINFILE.\n\
+##\n\
+##"
+#	@read -t 60 -p "HOSTNAME (default $(HOST)): " && echo -e >> $@ \
+#"export EGNAPA_HOST=$${REPLY:-$(HOST)}\n\
+##export EGNAPA_HOST_CLASS=$${EGNAPA_HOST_CLASS:-mac}              # eg, one of dev, stg, prd, loc\n\
+#\n\
+#export EGNAPA_SSL_CERTFILE=\n\
+#export EGNAPA_SSL_KEYFILE=\n\
+#export EGNAPA_SSL_CHAINFILE=\n\
+#"
+#
 #egnapa:
 #	@echo "Defining host class \"$(EGNAPA_HOST_CLASS)\""
-
+#
 #egnapa:
 #	@if [[ -z "$(EGNAPA_HOST_CLASS)" ]]; then \
 #		echo "EGNAPA_HOST_CLASS not defined (see ~/warts/env.sh)"; \
 #		exit 1; \
 #	fi
 #	@echo "Defining $(EGNAPA_CLASS) host class \"$(EGNAPA_HOST_CLASS)\" via ~/warts/env.sh. xxx next time via 'admegn class'"
-
+#
 # yyy to do: preprocess crontab files so that MAILTO var gets set via a
 #     setting in warts/env.sh
-
-# XXX should cron files become generic?
-# XXX should we turn off error checks and stuff until install is finished
-#     and let that be the choice of developer?
+#
 #cron: egnapa
-
+#
 #cron:
 #	@cd cron; \
 #	if [[ ! -s $$( readlink crontab ) ]]; then \
@@ -123,19 +110,19 @@ export EGNAPA_SSL_CHAINFILE=\n\
 #		crontab crontab; \
 #	fi
 # XXX change .dev to nothing
-
-	#@if [[ ! -s crontab.master ]]; then \
-	#	echo 'Error: not updating crontab from zero-length file'; \
-	#	exit 1; \
-	#fi; \
-	#else \
-	#	crontab -l > crontab_saved; \
-	#	cmp --silent crontab_saved crontab.master && { \
-	#		exit 0; \
-	#	}; \
-	#	echo Updating crontab via crontab.master; \
-	#	crontab crontab.master; \
-	#fi
+#
+#	#@if [[ ! -s crontab.master ]]; then \
+#	#	echo 'Error: not updating crontab from zero-length file'; \
+#	#	exit 1; \
+#	#fi; \
+#	#else \
+#	#	crontab -l > crontab_saved; \
+#	#	cmp --silent crontab_saved crontab.master && { \
+#	#		exit 0; \
+#	#	}; \
+#	#	echo Updating crontab via crontab.master; \
+#	#	crontab crontab.master; \
+#	#fi
 
 crontab:
 	@ ctab=crontab.main; \

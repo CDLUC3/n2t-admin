@@ -187,15 +187,13 @@ EOT
 export EGNAPA_HOST=$hostname
 export EGNAPA_HOST_CLASS=$class		# eg, one of dev, stg, prd, loc
 
-# Define filenames to hold copies (NOT the master files) of your certificates.
-# Use EGNAPA_SSL_CERTFILE for the full path of a signed certificate, if any,
-#     and similarly for EGNAPA_SSL_KEYFILE and EGNAPA_SSL_CHAINFILE.
+# Define fullpaths to the certificate files. Use EGNAPA_SSL_CERTFILE for
+# the main certificate and EGNAPA_SSL_KEYFILE for the pirviate key.
 
-ssldir=/apps/n2t/warts/ssl/2022-04-16
-export  EGNAPA_SSL_CERTFILE=\$ssldir/ids-n2t2-prd_n2t_net_cert.cer
-export   EGNAPA_SSL_KEYFILE=\$ssldir/ids-n2t2-prd_n2t_net.key
-export EGNAPA_SSL_CHAINFILE=\$ssldir/cdl-20200530.int-root
-#export EGNAPA_SSL_CHAINFILE=\$ssldir/ids-n2t2-prd_n2t_net_interm.cer
+ssldir=/apps/n2t/warts/ssl/n2t.net
+# see \$ssldir/README for file choices
+export EGNAPA_SSL_CERTFILE=\$ssldir/fullchain.pem
+export EGNAPA_SSL_KEYFILE=\$ssldir/privkey.pem
 
 # Define email address to receive system notifications, eg, from crontab.
 export EGNAPA_MAILTO='$mailto'
