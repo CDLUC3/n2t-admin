@@ -18,6 +18,7 @@ summary="
        $me mdump [ -v ] [ Minter/nog.bdb ... ] [ > MinterStates ]
        $me mload [ -nv ] Dir [ < MinterStates ]
      (from backup) db_dump egg.bdb | ssh \$HOST '(cd \$dbdir; db_load egg.bdb)'
+     $me cert_check [ restart | notify | '' ]
      $me validate_naans [ NAANsFile ]
      $me rcheck [ -v ]
      $me rstat IdPattern Logfile ...
@@ -133,6 +134,13 @@ creates a timestamped dump of it, suggests a next harvest: entry
             > do
             >     $me mload \$sa/minters < m\$p
             > done
+
+       The "cert_check" form looks for an updated TLS/SSL certificate (from
+       Let's Encrypt) and, if found, backs up the current cert, copies in
+       the new cert, and takes the action "restart", "notify", or none, ie,
+       restarting the server or emailing a notification (eg, in a production
+       setting). Usually called from crontab based on a non-empty value for
+       "\$(egg cfq new_cert_action)".
 
        The "validate_naans" form performs consistency and uniqueness checks
        on a NAANsFile containing ANVL-formatted NAAN records, returning a
@@ -826,8 +834,50 @@ EOT
 	return
 }
 
-function rcheck {
+# Doc for script /home/cdlinfra/ssl/script/cert_sync.sh at
+# https://confluence.ucop.edu/display/CUG/SSL+Certificate+Management+Users+Guide
 
+function cert_check {
+
+	local arg out cmd
+	arg="${1:-}"
+	[[ ! "$arg" ]] &&
+		return 0		# no command means no-op, no action
+
+	echo -n "+---- new cert check" $( date )	# no newline yet
+
+	case $arg in
+	restart)
+		cmd="$HOME/init.d/apache restart"
+		;;
+	notify)
+		cmd="mail -s 'new cert: manual apache restart advised' $notify"
+		;;
+	*)
+		echo
+		echo "error: $0 cert_check $arg: unknown command arg"
+		return 1
+		;;
+	esac
+
+	# /dev/null terminates any mail input
+	out=$( /home/cdlinfra/ssl/script/cert_sync.sh \
+		--outdir $HOME/warts/ssl/n2t.net \
+		--restartcmd "$cmd" \
+		"$( hostname -f )" \
+		< /dev/null \
+	)
+	if [[ "$out" ]]
+	then
+		echo
+		echo "$out"
+	else
+		echo ": no updates"
+	fi
+	return
+}
+
+function rcheck { 
 	local i t itcnt got errcnt=0 msg=''
 	local array i_t_pairs=(			# identifier/target pairs
 	  'ark:/12345/fk1234'
@@ -1757,6 +1807,10 @@ mdump)
 	;;
 mload)
 	mload $@
+	exit
+	;;
+cert_check)
+	cert_check "$@"
 	exit
 	;;
 validate_naans)
