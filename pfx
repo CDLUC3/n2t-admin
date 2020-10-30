@@ -35,7 +35,8 @@ function usage {
 		cat << EOT
 For more information, do "$me help". Basic subcommands:
 
-publish       copy given component to publicly harvestable part of this server
+subpublish    copy given component to publicly harvestable part of this server
+       yyy    but don't conflict with 'pub/' managed on prd by 'naans' repo
 harvest       assemble components from external sources (eg, daily via cron)
 import        assemble harvested prefix components into \$pfx_import
 test          test prefix lookup and redirect rules (only tests BUILD area)
@@ -88,7 +89,10 @@ DESCRIPTION
     The following sub-commands may be executed in the order listed to update
     the prefixes running on the system.
 
-  publish Component
+  subpublish Component
+	    XXX modify to push these components to predictable area on each
+	        of the dev and stg hosts
+	    XXX not yet implemented
             To be run only on the host (usually prd) where the Component file
             is maintained, copy it to a publicly harvestable part of the host's
             server, eg, to be harvested by dev, stg, or replica prd servers.
@@ -248,8 +252,7 @@ gitpfx=gitpfx
 gitpfxFile=$gitpfx.yaml
 ebi_outfile=ebi.anvl
 
-#naanFile=naan_registry.txt
-naanFile=master_naans
+naanFile=naan_registry.txt
 naanURL=http://n2t.net/e/$naanFile
 shnaanshFile=shoulder_registry.txt	# shared naan shoulder file
 shdrFile=master_shoulders.txt
@@ -360,8 +363,9 @@ pfx_quarantine=$pfx_harvest/quarantine
 pfx_maint_host=$pfx_maint_user@ids-n2t-prd-2a.n2t.net	# where maintained
 ebireg=ebireg		# from http://identifiers.org/service/registryxml
 pfx_base=pfx_base.yaml				# yyy should be pfx_base.yaml
+#	master_naans
 pfx_sources=(					# yyy normalized names
-	master_naans
+	naan_registry.txt
 	master_shoulders.txt 
 	shoulder_registry.txt			# shared naan shoulder file
 	ebireg.xml
@@ -375,7 +379,7 @@ pfx_sources=(					# yyy normalized names
 source_base_prefixes=build/eggnog/t/n2t/$pfx_base
 master_base_prefixes=$sv/$source_base_prefixes
 
-published=$sv/apache2/htdocs/e/pub
+subpublished=$sv/apache2/htdocs/e/subpub
 
 # first check for errors in harvested sources; if none move out of
 # quarantine; if there's an error in a quarantined file, it stays
@@ -433,31 +437,32 @@ function pfx_mark4refresh {
 	echo "$(cat $markfile) pretend marked for refresh"
 }
 
-# "publish" various prefix components via the current server
+# "subpublish" various prefix components via the current server
 # XXX is this used anywhere?
 
-function pfx_publish {
+function pfx_subpublish {
 
-	mkdir -p $published
+	mkdir -p $subpublished
 	local comp=${1:-}
 	case $comp in
 	naans)		# not really harvested, this completes the components
 		# yyy source path change from shoulders/naans to just naans
-		cp -p ~/shoulders/naans/master_naans $published
+		cp -p ~/shoulders/naans/naan_registry $subpublished/
+		#cp -p ~/shoulders/naans/master_naans $subpublished/
 		;;
 	shoulders)
-		cp -p ~/shoulders/master_shoulders.txt $published
+		cp -p ~/shoulders/master_shoulders.txt $subpublished/
 		;;
 	other)
-		cp -p ~/shoulders/lsregistry.yml $published
+		cp -p ~/shoulders/lsregistry.yml $subpublished/
 		;;
 	base)		# not really harvested, this completes the components
-		cp -p $master_base_prefixes $published
-		#cp -p ~/$master_base_prefixes $published
+		cp -p $master_base_prefixes $subpublished/
+		#cp -p ~/$master_base_prefixes $subpublished
 		;;
 	*)
 		cat << EOT
-Usage: pfx publish base|shoulders|naans|other
+Usage: pfx subpublish base|shoulders|naans|other
 where
   shoulders  is maintained on the prd server
   naans      is maintained on the prd server
@@ -544,7 +549,7 @@ function pfx_harvest {
 		}
 	done
 	# kludge to rename!
-	mv $pfx_quarantine/{naan_registry.txt,master_naans}	# yyy kludge!
+	#mv $pfx_quarantine/{naan_registry.txt,master_naans}	# yyy kludge!
 
 	# by default, dns, connect, and read timeouts are 900 secs (15 mins)
 	# yyy --timeout=90 ?
@@ -577,7 +582,6 @@ function pfx_harvest {
 
 	pfx_harvest_validate ||	# if ok, moves files up out of quarantine
 		return 1
-
 	return 0
 }
 
@@ -2696,8 +2700,8 @@ build)
 	pfx_build
 	exit
 	;;
-publish)
-	pfx_publish "$@"
+subpublish)
+	pfx_subpublish "$@"
 	exit
 	;;
 validate)
