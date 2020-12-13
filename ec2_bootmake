@@ -317,6 +317,7 @@ EOT
 	sudo yum -y erase 'perl(Log::Log4perl)'
 	sudo yum -y erase 'perl(XML::LibXML)' 'perl(XML::LibXSLT)'
 	sudo yum -y erase 'perl(App::cpanminus)'
+	sudo yum -y erase 'perl(CGI)'
 	sudo yum -y erase python3		# for transition
 	sudo yum -y erase jq			# for Internet Archive API
 	sudo yum -y erase golang		# nice, but not essential
@@ -372,6 +373,7 @@ grep "^cdl.username.*$fakeuser" $hgrc && {
 	sudo yum -y install 'perl(Try::Tiny)'
 	sudo yum -y install 'perl(Safe::Isa)'
 	sudo yum -y install 'perl(boolean)'
+	sudo yum -y install 'perl(CGI)'
 
 	# yyy why not install better version with cpanm?
 	sudo yum -y install 'perl(Log::Log4perl)'
