@@ -136,11 +136,16 @@ creates a timestamped dump of it, suggests a next harvest: entry
             > done
 
        The "cert_check" form looks for an updated TLS/SSL certificate (from
-       Let's Encrypt) and, if found, backs up the current cert, copies in
-       the new cert, and takes the action "restart", "notify", or none, ie,
-       restarting the server or emailing a notification (eg, in a production
-       setting). Usually called from crontab based on a non-empty value for
-       "\$(egg cfq new_cert_action)".
+       Let's Encrypt) and, if found, copies it into ~/warts/ssl/n2t.net after
+       creating a backup copy (n2t.net.bak), and then takes the action
+       "restart", "notify", or "" (none), ie, restarting Apache or emailing
+       a notification. A "notify" action may be be useful in a production
+       setting if you wish to do a manual "apache restart", but must be dealt
+       with promptly because an unintended restart (eg, from a system reboot)
+       will use the new cert. To rollback to the old cert, it suffices to
+       rename the n2t.net.bak/ directory to n2t.net/ and do "apache restart".
+       The "cert_check" form is usually called from crontab based on testing
+       for a non-empty value returned by "\$(egg cfq new_cert_action)".
 
        The "validate_naans" form performs consistency and uniqueness checks
        on a NAANsFile containing ANVL-formatted NAAN records, returning a
@@ -837,9 +842,11 @@ EOT
 # Doc for script /home/cdlinfra/ssl/script/cert_sync.sh at
 # https://confluence.ucop.edu/display/CUG/SSL+Certificate+Management+Users+Guide
 
+# Note: new certs are valid for 90 days.
+
 function cert_check {
 
-	local arg out cmd
+	local arg out cmd subject
 	arg="${1:-}"
 	[[ ! "$arg" ]] &&
 		return 0		# no command means no-op, no action
@@ -851,7 +858,8 @@ function cert_check {
 		cmd="$HOME/init.d/apache restart"
 		;;
 	notify)
-		cmd="mail -s 'new cert: manual apache restart advised' $notify"
+		subject='new cert: manual "apache restart" advised'
+		cmd="mail -s '$subject' $notify"
 		;;
 	*)
 		echo
