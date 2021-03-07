@@ -893,7 +893,7 @@ function rcheck {
 	  'ark:/12345/fk1235'
 		'https://en.wikipedia.org/wiki'
 	  'ark:/12345/fk3'
-		'https://www.google.com/#q='
+		'https://www.google.com/search?q='
 	)
 	(( itcnt=(${#i_t_pairs[@]} / 2) ))
 
