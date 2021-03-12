@@ -1,6 +1,6 @@
-# Customize this shared (eg, role) account user's startup files based
-# on who is actually logged into it; find that user and source anything
-# that you find for that user under ~/.profile.d/<username>.
+# Customize this shared (eg, role) account user's startup files based on
+# who is actually logged into it. Determine the user and source any file
+# that you find for that user named ~/.profile.d/<username>.
 
 if [ -f ~/.bashrc ] ; then
 	source ~/.bashrc

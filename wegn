@@ -37,13 +37,13 @@ EOT
 	[[ ! "$1" == help ]] &&		# if not asking for full information
 		return 0
 
-cat << EOT
+	cat << EOT
     Currently configured-in server abbreviations:
 
-      prd  -->  ${def_prd:-??}
-      stg  -->  ${def_stg:-??}
-      dev  -->  ${def_dev:-??}
-      loc  -->  ${def_loc:-??}
+      prd  -->  $( host_where class prd )
+      stg  -->  $( host_where class stg )
+      dev  -->  $( host_where class dev )
+      loc  -->  $( host_where class loc )
 
 OPTIONS
     -v         Make $me more verbose.
@@ -127,6 +127,11 @@ SECURITY CONSIDERATIONS
 EOT
 }
 
+function host_where {
+	# in case there's more than one matching line, take just first line
+	egg --home $HOME/sv/cur/apache2 cfq _host_where $@ | head -1
+}
+
 function wegn_cfg {
 
 	cfgdir="$1"
@@ -186,9 +191,9 @@ function wegn_cfg {
 	#def_loc=$EGNAPA_HOST:$EGNAPA_PORT_HPRS
 	def_loc=localhost:$EGNAPA_PORT_HPRS
 
-	def_prd=${EGNAPA_SERVER_prd}
-	def_stg=${EGNAPA_SERVER_stg}
-	def_dev=${EGNAPA_SERVER_dev}
+	#def_prd=${EGNAPA_SERVER_prd}
+	#def_stg=${EGNAPA_SERVER_stg}
+	#def_dev=${EGNAPA_SERVER_dev}
 
 	def_host=$def_loc
 	def_user=ezid
@@ -228,6 +233,28 @@ function humb_parse {
 		minter=$( undelimit <<< ${humb[2]} )	# override default
 	[[ "${humb[3]}" != @@ ]] &&	# empty value detected
 		binder=$( undelimit <<< ${humb[3]} )	# override default
+}
+
+# Ugly, but effective, this next setval function separates stderr
+# from stdout without requiring the use of a temp file.
+#   From # https://stackoverflow.com/questions/11027679/ ...
+#      capture-stdout-and-stderr-into-different-variables
+#   also https://stackoverflow.com/questions/11027679/capture- ...
+#      stdout-and-stderr-into-different-variables/28796214#28796214
+#
+# Usage:  eval "$( execcmd 2> >(setval errval) > >(setval stdval); \
+#		<<<"$?" setval retval; )"
+# 
+# function dummy
+#	{ echo "I'm std"; echo "I'm err" >&2; return 34; }
+# eval "$( dummy 2> >(setval errval) > >(setval stdval); \
+#	<<<"$?" setval retval; )"
+# echo "std out is : |$stdval| std err is : |$errval| \
+#	return val is : |$retval|"
+
+function setval {
+	printf -v "$1" "%s" "$(cat)"
+	declare -p "$1"
 }
 
 function wegn_cmd {
@@ -285,7 +312,7 @@ function wegn_cmd {
 		return 1
 	}
 
-	terrs=$( mktemp /tmp/wegn.XXXX )
+	#terrs=$( mktemp /tmp/wegn.XXXX )
 	egnverbose=
 	[[ $verbose ]] &&
 		egnverbose="--verbose"
@@ -309,14 +336,27 @@ function wegn_cmd {
 			wargs+="--max-redirect 0"
 
 		[[ $verbose ]] &&
-			echo "Running: wget $wargs $extra_wget_args \"$wurl\""
-		wget 2> $terrs $wargs $extra_wget_args "$wurl"
-		wstat=$?	# yyy Hmm, seems to return '8' even on success?
+			echo "Running: wget $wargs $extra_wargs \"$wurl\""
+
+		#wget 2> $terrs $wargs $extra_wargs "$wurl"
+		unset out terrs t_ret
+		eval "$( wget $wargs --password="$pw" $extra_wargs "$wurl" \
+			2> >(setval terrs) > >(setval out); \
+			 	<<<"$?" setval t_ret; )"
+
 		if [[ $resolve ]]
 		then				# drop the "following" message
-			loc=$( grep 'Location: http' $terrs )
+			#loc=$( grep 'Location: http' $terrs )
+			loc=$( grep 'Location: http' <<< "$terrs" )
+			echo "$out"
 		else
-			loc=$(sed -n '/Location: http/s/ .following.//p' $terrs)
+			# yyy wget problem? can't get full headers with
+			#     --max-redirects 0; will start using curl instead
+			#loc=$(sed -n '/Location: http/s/ .following.//p' $terrs)
+			loc=$(sed -n '/Location: http/s/ .following.//p' \
+				<<< "$terrs")
+			# XXX produces 3 redirects ; change admegn rcheck test
+			# to use https and just cdlib.org and not www.cdlib.org
 			wstat=0		# we were successful at finding a value
 		fi
 		if [[ $loc ]]
@@ -328,22 +368,29 @@ function wegn_cmd {
 	else
 		[[ $verbose ]] && {
 			echo "Running: wget $wargs" \
-				"--password=xxx $extra_wget_args \"$wurl\""
+				"--password=xxx $extra_wargs \"$wurl\""
 		}
 
-		wget 2> $terrs $wargs --password="$pw" $extra_wget_args "$wurl"
-		wstat=$?
+		#wget 2> $terrs $wargs --password="$pw" $extra_wargs "$wurl"
+		unset out terrs t_ret
+		eval "$( wget $wargs --password="$pw" $extra_wargs "$wurl" \
+			2> >(setval terrs) > >(setval out); \
+			 	<<<"$?" setval t_ret; )"
+		echo "$out"
+		wstat=$t_ret
 	fi
 	[[ $wstat != 0 ]] && {
 		echo "wget error: $wstat"
-		cat $terrs
-		rm -f $terrs
+		echo "$terrs"
+		#cat $terrs
+		#rm -f $terrs
 		return 1
 	}
 	[[ $verbose ]] && {
 		echo "wget output:"
-		cat $terrs
-		rm -f $terrs
+		echo "$terrs"
+		#cat $terrs
+		#rm -f $terrs
 	}
 	return 0
 }
@@ -355,7 +402,7 @@ function wegn_cmd {
 # "web" shipped with the eggnog source.  We crudely prefer the first
 # directory in $src_top/t that (a) is NOT t/web and (b) contains what
 # looks like a $bstcfg file.
-#
+
 svumode=$( sed 's/^[^:]*://' <<< $SVU_USING )
 [[ "$svumode" ]] ||
 	svumode=cur		# if none, default to "cur"
@@ -387,7 +434,7 @@ infile=
 verbose=
 humb_opt=
 pw=
-extra_wget_args=
+extra_wargs=
 while [[ "$1" =~ ^- ]]
 do
 	case $1 in
@@ -432,15 +479,15 @@ do
 		exit
 		;;
 	*)
-		extra_wget_args+=" $1"
+		extra_wargs+=" $1"
 		shift
 		;;
 	esac
 done
 
-[[ "$extra_wget_args" ]] && {
+[[ "$extra_wargs" ]] && {
 	echo "Passing to wget, but otherwise ignoring, these flag arguments:"
-	echo "   $extra_wget_args"
+	echo "   $extra_wargs"
 }
 
 [[ "$1" =~ @$|@.*@ ]] && {		# if there's a final @ or two @'s
@@ -457,10 +504,15 @@ done
 	[[ "$host" =~ : ]] &&
 		portpart=$( sed 's/^.*\(:.*\)/\1/' <<< $host )
 	hostpart=$( sed 's/:.*//' <<< $host )
-	h=def_$hostpart			# use h just as an indirect variable
-	if [[ "${!h}" ]] 		# if we have a def_$hostpart variable
+	#h=def_$hostpart		# use h just as an indirect variable
+	h=$( host_where class $hostpart )
+	if [[ "$h" ]] 		# if found host with matching class
+	#if [[ "${!h}" ]] 		# if we have a def_$hostpart variable
 	then
-		hostpart=${!h}		# use it, else stay with caller's value
+		[[ "$h" == "localhost" ]] &&
+			h=localhost:$EGNAPA_PORT_HPRS
+		hostpart=${h}		# use it, else stay with caller's value
+		#hostpart=${!h}		# use it, else stay with caller's value
 	else
 		echo "Warning: no host mapping found for abbreviation" \
 			"$hostpart."

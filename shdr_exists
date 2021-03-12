@@ -32,7 +32,8 @@ minter_file=$shdrdir/$minter_tracer
 
 # checks for a minter # XXX does it work?
 #any=$(grep -w $shdrdir /noid/naans/master_shoulders | grep -v nd/noid)
-any=$( egrep '^minter:|^::' $sv/apache2/shoulders/master_shoulders.txt |
+#any=$( egrep '^minter:|^::' $sv/apache2/shoulders/master_shoulders.txt |
+any=$( egrep '^minter:|^::' $sv/apache2/pfx/build/master_shoulders.txt |
 		grep -i "$shdrdir" )
 [[ $any == "" ]] && {
 	#echo $shdrdir

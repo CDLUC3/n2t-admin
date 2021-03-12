@@ -26,7 +26,8 @@ summary="
        $me [flags] status [ Port ... ]
 
        $me rs_config
-       $me [flags] rs_start
+       $me [flags] rs_start_ikwid
+       $me [flags] rs_stop_ikwid
        $me [flags] rs_list
        $me [flags] rs_status
        $me [flags] repltest [ Setcount ]
@@ -53,44 +54,65 @@ DESCRIPTION
        do what the name suggests. Given no arguments, these commands operate
        on all the daemons listed in the MG_LOCAL_DAEMONS environment variable.
        This and other replica set configuration variables are usually set via
-       ~/warts/env.sh. To see typical settings and other advice, run
+       ~/warts/env.sh and the "ec2_bootmake" script should have initialized 
+       the replica set ("$me rs_start_ikwid").
+       
+       Be very careful initializing or reinitializing your replica set, as
+       I find it far too easy to get into a state where the only recourse
+       is to remove all data and start over.
+
+REPLICA SETS
+       Approach with caution (until I can document this better).  To see
+       typical settings and other advice, run
 
            $me rs_config
        
-       You must establish these setting to use most replica set commands
-       (beginning "rs_..."). Once done, you can establish a replica set with
+       To be run exactly ONCE (and if it gets hosed, you may have to remove
+       and lose all your data), the following should have been run in
+       ec2_bootmake to enable most replica set commands (beginning "rs_...").
 
-           $me rs_start
+           $me rs_start_ikwid
 
        It starts up all local daemons and adds them to the set. It is meant
-       to be used ONCE or rarely. Permanent replica set state information is
-       maintained in the mongodb data stores of the member instances. After
-       the host reboots, for example, it's enough simply to restart a local
-       daemon, which remembers that it belongs to the set. If you mess up
-       initialization (easy), stop all mongo servers and remove the data
-       directories under \$sv/apache2/mongo/, and do "$me rs_start" again.
+       to be used ONCE or rarely. IKWID means "I know what I'm doing".
+       Permanent replica set state information is maintained in the mongodb
+       data stores of the member instances. After the host reboots, for
+       example, it's enough simply to restart a local daemon, which remembers
+       that it belongs to the set. If you mess up initialization (easy), stop
+       all mongo servers and remove all the data directories under
+       \$sv/apache2/mongo/, and do "$me rs_start_ikwid" again.
 
+REPLICA SET COMMANDS
        Use the commands
 
            rs_list, rs_status, rs_test
 
        to list current set instances, dump a verbose set status report (JSON),
        or write/read some new data to/from each set instance, respectively.
+       If the rs_* commands can't connect, look for "Error" in the output of
+
+           $me -v status
 
        Each mongo instance starts up ready to be part of the replica set "live"
        by default, or "test" if -t was given. Behind the scenes are internal
        commands that are NOT recommended unless you know what you're doing, eg,
-       for 3 configured local daemons, rs_start does something like
+       for 3 configured local daemons, rs_start_ikwid does something like
 
            $me rs_add 27017
            $me rs_add 27018
            $me rs_add 27019
 
        Each instance is started ("$me start") before being added. The first
-       added instance initiates the set. Tearing down a set (uses "rs_del')
-       is messier and mongo resists when the set count falls lower than 3.
-       This can be seen in test mode by running the "repltest" command (below).
-       
+       added instance initiates the set. Tearing down a set (via "rs_del')
+       is messier and mongo resists when the set count falls lower than 3,
+       so if you really want to bring the last server down you may have to
+       remove it from the replica set (which doesn't remove its data):
+
+           $me rs_del ...
+
+       The resistance can be seen in test mode by running the "repltest"
+       command (below) and is a pain when stopping and restarting apache.
+
        The replica set operated on is the "live" public-facing set (usually
        ports starting from 27017) unless the -t flag is present, in which case
        a test replica set is used (usually ports starting from 47017).
@@ -114,7 +136,7 @@ FILES
 
 EXAMPLES
        $me rs_config      # read this FIRST and configure ~/warts/env.sh
-       $me rs_start       # ONE-TIME operation after configuration
+       $me rs_start_ikwid       # ONE-TIME operation after configuration
        $me start          # run at host boot time
        $me stop           # run at host shutdown
        $me repltest 11    # set up, test, and tear down 11-member replica set
@@ -177,7 +199,7 @@ mg_live_mode=live		# 'live' or 'test'
 mg_test_mode=test		# 'live' or 'test'
 
 mg_other="--fork --logappend"		# additional mongod daemon flags
-mg_other+=" --storageEngine wiredTiger"
+#mg_other+=" --storageEngine wiredTiger"	# this is the default
 #--bind_ip 'localhost,172.31.23.24'	# no space after comma
 #--rest		# deprecated since 3.2: admin UI: http://localhost:28017
 
@@ -273,6 +295,7 @@ function use_mg {			# call with: port|'any' [ setname ]
 	mg_procfile="$mg_proc_base""local:$mg_port"
 	mg_procfile_alt="$mg_proc_base_alt""local:$mg_port"
 	mg_flags=(
+		--bind_ip "localhost,$mg_host"		# no space after comma
 		--port $mg_port --replSet $mg_setname
 		--dbpath $mg_dbpath --logpath $mg_dblog
 		$mg_other
@@ -1301,13 +1324,13 @@ function status {				# call with: [ port ]
 		[[ "$pidcount" -eq 0 ]] &&
 			echo "WARNING: but the pidcount is $pidcount?"
 		[[ "$verbose" ]] && {
-			echo "=== Mongo Configuration ==="
+			echo "=== $mg_port Mongo Configuration ==="
 			mongo --port $mg_port --eval "db.serverStatus()"
-			echo "=== Mongo Replica Set Configuration ==="
+			echo "=== $mg_port Mongo Replica Set Configuration ==="
 			mongo --port $mg_port --eval "rs.conf()"
-			echo "=== Mongo Replica Set Status ==="
+			echo "=== $mg_port Mongo Replica Set Status ==="
 			mongo --port $mg_port --eval "rs.status()"
-			echo "=== Mongod startup file ==="
+			echo "=== $mg_port Mongod startup file ==="
 			cat $mg_procfile
 		}
 			
@@ -1672,11 +1695,11 @@ rs_list)
 	rs_list "$@"
 	exit
 	;;
-rs_start)
+rs_start_ikwid)
 	rs_start "$@"
 	exit
 	;;
-rs_stop)
+rs_stop_ikwid)
 	rs_stop "$@"
 	exit
 	;;

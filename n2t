@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+set -u			# use of unset variables throws an error
 me=$( basename $0 )
 function usage {
 	cat << EOT
@@ -14,14 +15,28 @@ DESCRIPTION
 
 This script supports commands that automate common N2T service admin tasks.
 
-  import      bring in and TEST the latest code base in the repo
-  rollout     stop public-facing server, install new code, restart server
-  test        test code installed in currently running public-facing server
-  rollback    back out of the last rollout, reverting to the prior rollout
-  checkpoint  mark rollback point (to be run before "hg update")
+  import       bring in and TEST the latest code base in the repo
+  rollout      stop public-facing server, install new code, restart server
+  test         test code installed in currently running public-facing server
+  rolltest     same as "n2t rollout && n2t test", observing --force setting
 
-The first three commands above reflect the normal sequence.  Use "rollback"
-only if "test" failed.  Use "checkpoint" if you're not using "import".
+  rollback     back out of the last rollout, reverting to the prior rollout
+  checkpoint   XXX mark rollback point (to be run before "hg update")
+  checkpoint   XXX mark rollback point (to be run before "git checkout")
+
+  cron off     install cronstop file to (by default) disable all crontab jobs
+  cron on      install or re-enable usual crontab jobs
+  cron check   check if a cronstop file exists; if so exit 1, else exit 0
+
+  cfq <query>  configuration query via egg with preset --home \$sa
+
+  ezid <args>  run "egg <args>" with options to select public ezid binder
+  oca  <args>  run "egg <args>" with options to select public oca  binder
+  yamz <args>  run "egg <args>" with options to select public yamz binder
+  ...  <args>  similar for "ncpt", "idra", "pfx" binders
+
+The first three commands above reflect the normal sequence. Use "rollback"
+only if "test" failed. Use "checkpoint" if you're not using "import".
 
 NB: The first time you ever run this script on a new system, you need to
 "prime the pump".  The script assumes you are working under "svu cur",
@@ -32,6 +47,7 @@ installs under "svu new".
 EOT
 }
 
+n2t_service_dir=~/n2t_create
 mkperl="perl Makefile.PL INSTALL_BASE=$PERL_INSTALL_BASE"
 #bst_cmd="./build_server_tree --public build t/n2t"
 bst_cmd="./build_server_tree --public build n2t"
@@ -40,23 +56,38 @@ emsg+="override with --force."
 
 function check_changes {
 
-	hgid=$( hg identify | sed 's/ .*//' )
-		# in git would do this check with "git diff --quiet"
-	changes=
-	[[ ! $hgid || "$hgid" =~ \+ ]] &&
+	local ib=$( grep INSTALL_BASE Makefile )
+	[[ ! "$ib" ]] && {
+		echo "PANIC -- Makefile wasn't built with an INSTALL_BASE " 1>&2
+		echo "Did you use 'mkperl'? Usually it's aliased to" \
+			"something like:" 1>&2
+		echo "        $mkperl" 1>&2
+		exit 1
+	}
+	local h=$( perl -pE 's/\s+//g' <<< "$EGNAPA_HOST" )
+	[[ ! "$h" ]] && {			# sanity test comes in handy
+		echo "PANIC -- EGNAPA_HOST ($EGNAPA_HOST) looks wrong" 1>&2
+		exit 1
+	}
+	#hgid=$( hg identify | sed 's/ .*//' )
+	gitid=$( git show --oneline | sed 's/ .*//;q' )
+	changes=$( git diff )
+	[[ ! $gitid ]] &&
 		changes=1
 	[[ ! $changes || $force ]] &&
 		return 0
 	return 1
 }
 
-function check_default_minders {
+function check_default_binders {
+
 	minder_type=$1
 	# Note: if needed, build_server_tree makes a new NAANs minter from
 	# scratch, in ~/sv/cur/build/eggnog/td_egnapa/minters/n2t/naans
 	[[ $minder_type != binders ]] &&
 		return			# we don't check minters or shoulders
 	# if we get here, we're checking for default binders
+
 	local binders
 	binders=$( shopt -s nullglob; echo $nsf/$minder_type/* )
 	[[ "$binders" == "" ]] && {
@@ -64,58 +95,116 @@ function check_default_minders {
 			"empty: $nsf/$minder_type"
 		return 1
 	}
+	dstdir=$aptop/$minder_type
 	for binder in $binders
 	do
-		b=$( basename $binder )
-		[[ -e $aptop/$minder_type/$b ]] &&	# if it already exists,
-			continue			# assume binder is ok
-		# Y is default.
-		read -t 30 -p \
-			"Server has no $b binder.  Copy from new server? [Y/n] "
-		[[ $? != 0 ]] && {
-			echo -e "\nError: response EOF or timeout: aborting."
-			exit 1
+		# Summary: derive short binder name into $b, convert $b
+		# to proper prod $dstb, if $dstb does NOT exist in
+		# public directory, ask to create it
+
+		[[ -f $binder ]] && {		# if it's a file, just copy it
+			cp -p $binder $dstdir/		# (eg, README file)
+			continue			# and do next item
 		}
-		[[ $REPLY == "" || $REPLY =~ ^[yY] ]] ||
+
+		# If we get here, $binder is not a file.
+
+		# See if it's an actual binder and parse to pick out
+		# pieces we'll need to construct the new name. First do
+		# a complete parse into printf -v (trick to set bash variable
+		# names and values) commands, and then eval the output string.
+
+		#var_val_pairs=$( egg bxname --all $binder | sed -n \
+		var_val_pairs=$( perl -Mblib egg bxname --all $binder | sed -n \
+			's/^\([^:]*\): \(.*\)/printf -v "\1" "%s" "\2"; /p' )
+		eval "$var_val_pairs"
+
+		[[ ! "${iexists:-}" ]] && {
+			echo "Warning: skipping non-binder $binder"
 			continue
-		cp -npr $binder $aptop/$minder_type
+		}
+
+		# Does its public (rolled out) counterpart "destination
+		# binder" exist? Derive its name into $dstb in a process
+		# that relies on --home $aptop in EGG env var to pull in
+		# the correctly configured service and class values.
+
+		b=${user_binder_name:-}
+		dstb=$( perl -Mblib egg --isolator public bpname $b | \
+			sed -n 's/\..*/./p' )
+		dstb+="${stablename:-}"
+
+		# yyy
+		# bmv problems for source binder
+		# egg_n2t_dev_idsn2t2dev2bn2tnet.real_n2t_s_ezid
+		#       ^^ no _td                     ^^^ should be ezid
+
+		# Does $dstb already exist?
+		is_binder=$( perl -Mblib egg bxname $dstdir/$dstb )
+
+		[[ "$is_binder" ]] && {		# if $dstb exists, skip to
+			continue			# the next item
+		}
+
+		## If we get here, ask to create new public binder. Default is Y.
+		#read -t 30 -p \
+		#	"Server has no $b binder.  Copy from new server? [Y/n] "
+		#[[ $? != 0 ]] && {
+		#	echo -e "\nError: response EOF or timeout: aborting."
+		#	exit 1
+		#}
+		#[[ $REPLY == "" || $REPLY =~ ^[yY] ]] ||
+		#	continue
+
+		perl -Mblib egg bmv $binder $dstdir/$dstb
+		echo Initializing binder: $dstdir/$dstb 
+
+		#perl -Mblib egg --testdata td bmv $b $dstdir/$dstb
+
+		#cp -npr $binder $aptop/$minder_type
 	done
 	return 0
 }
 
 function check_minders {
-	for m in binders minters shoulders
-	do
-		# Don't want to overwrite any existing binders, but we want
-		# make sure (eg, first time deploy ever on new system) that
-		# at least some binders are in place (that's what
-		# check_default_minders is for). Regarding minters and
-		# shoulders, we don't copy in anything if there's already a
-		# minters (shoulders) directory, but for the first time, we
-		# do copy in fresh defaults.
 
-		if [[ -e $aptop/$m ]]
-		then
-			check_default_minders $m	# not checking return
+	# Do binders.
+	# Don't want to overwrite any existing binders, but we want make sure
+	# (eg, first time deploy ever on new system) that at least some
+	# binders are in place (that's what check_default_binders is for).
+
+	mkdir -p $aptop/binders
+	check_default_binders binders	# not checking return
+
+	# Do shoulders.
+
+	mkdir -p $aptop/shoulders	# yyy incomplete
+
+	# Do minters.
+	# Don't copy in anything if there's already a minter directory, but
+	# the first time seeing a new populator, we do copy in fresh defaults.
+
+	local populator dstpopulator
+	for m in $nsf/minters/*
+	do
+		populator=$( basename $m )
+		dstpopulator=$aptop/minters/$populator
+		[[ -e $dstpopulator ]] &&
 			continue
-		fi
-		# Y is default.
-		read -t 30 -p \
-			"Server has no $m directory.  Create? [Y/n] "
-		[[ $? != 0 ]] && {
-			echo -e "\nError: response EOF or timeout: aborting."
-			exit 1
+		echo Initializing directory: $dstpopulator
+		mkdir $dstpopulator || {
+			echo "Error: panic -- don't want to overwrite minters"
+			exit 1		# since no one checks our return status
 		}
-		[[ $REPLY == "" || $REPLY =~ ^[yY] ]] ||
-			continue
-		cp -pr $nsf/$m $aptop
+		cp -pr $m $aptop/minters/
 	done
 }
 
 function n2t_import {	# assumes caller ran check_changes!
 
-	hg pull		# hg pull -u only updates to tip if changesets pulled
-	hg update	# this makes sure that we update to the tip
+	#hg pull	# hg pull -u only updates to tip if changesets pulled
+	#hg update	# this makes sure that we update to the tip
+	git pull
 	# XXX maybe should first do a "make clean" to be safe?
 	$mkperl
 	make
@@ -128,7 +217,7 @@ function n2t_import {	# assumes caller ran check_changes!
 	#rm -fr $nsf	# XXX why? none of these steps alter td_egnapa_public
 }
 
-# This is the main event.  It assumes that caller (elsewhere in this
+# This is the main event. It assumes that the caller (elsewhere in this
 # script) has already run build_server_tree and has already stopped
 # (or tried to stop) the server.  So this is usually called in the
 # fraction of a second when the server needs to be down.
@@ -137,8 +226,7 @@ function n2t_import {	# assumes caller ran check_changes!
 # minters, logs) created during server tree construction and testing!
 # But there's one big exception: the prefixes yaml file is created
 # fresh each time from various text files kept under revision control.
-# XXX make sure to use only anonymized shoulders and naans files
-#
+
 function n2t_rollout {	# assumes caller ran check_changes!
 
 	local f d err=
@@ -146,11 +234,11 @@ function n2t_rollout {	# assumes caller ran check_changes!
 	local pubpx=cdl_ebi_prefixes.yaml
 	local n2tpx=n2t_prefixes.yaml
 	make || {		# "make" again, in case "import" wasn't done
-		echo "Error with make"
+		echo "Error with make" 1>&2
 		err=y
 	}
 	make install || {	# this installs both libraries and scripts
-		echo "Error with make install"
+		echo "Error with make install" 1>&2
 		err=y
 	}
 
@@ -161,7 +249,8 @@ function n2t_rollout {	# assumes caller ran check_changes!
 	# NB: local ALWAYS succeeds, so don't initialize via command
 	# in a "local" and expect to save the return status!
 	local dvcsid
-	dvcsid=$( hg identify | sed 's/ .*//' )
+	#dvcsid=$( hg identify | sed 's/ .*//' )
+	dvcsid=$( git show --oneline | sed 's/ .*//;q' )
 
 	# change to directory of the running production server
 	(cd $aptop || {
@@ -190,7 +279,8 @@ function n2t_rollout {	# assumes caller ran check_changes!
 		# eggnog_conf_default will be installed with the system.
 
 		#for d in cgi-bin conf htdocs ssl eggnog_conf_default
-		for d in cgi-bin conf htdocs eggnog_conf_default
+		#for d in cgi-bin conf htdocs eggnog_conf_default
+		for d in cgi-bin conf htdocs eggnog_conf
 		do
 			echo Copying contents of $nsf/$d.
 			cp -pr $nsf/$d . || {
@@ -210,7 +300,8 @@ function n2t_rollout {	# assumes caller ran check_changes!
 	)
 	[[ $err ]] &&
 		return 1
-	echo "`date`: rolled out binder revision `hg id -in`" \
+	#echo "`date`: rolled out binder revision `hg id -in`" \
+	echo "`date`: rolled out binder revision $dvcsid" \
 		>> ~/logs/rollout_log
 	return 0
 }
@@ -220,21 +311,25 @@ function n2t_rollout {	# assumes caller ran check_changes!
 # number is saved for the purpose of enabling possible later rollback.
 #
 function n2t_checkpoint {
-	hg identify | sed 's/ .*//' > .rollback		# save current revision
+	#hg identify | sed 's/ .*//' > .rollback	# save current revision
+	git show --oneline | sed 's/ .*//;q' > .rollback # save current revision
 }
 
 # Rollback to the checkpoint revision number, usually saved prior to last
 # import.  It's not right to switch to the previous revision in revision log,
 # as often there will be more than one revision since the previous rollout.
 # A second rollback will not undo a rollback (it will not do a re-rollout).
-# To undo a rollback, do "hg update" then "n2t rollout".
+## To undo a rollback, do "hg update" then "n2t rollout".
+# To undo a rollback, do "git checkout" then "n2t rollout".
 #
 function n2t_rollback {	# assumes caller ran check_changes!
 
 	local prior
 	[[ -r .rollback ]] &&
 		prior=$( < .rollback )
-	hg update -r ${prior:--2}	# if $prior empty, default to -2
+	#hg update -r ${prior:--2}	# if $prior empty, default to -2
+	# XXX untested!!
+	git checkout ${prior:-ERROR}	# if $prior empty, default to -2
 
 	$mkperl
 	make		# skip "make test" as now we're probably in a hurry
@@ -263,19 +358,20 @@ cd $sv/build/eggnog || {	# normally run from eggnog source directory
 	echo Could not chdir to $sv/build/eggnog.
 	exit 1
 }
-echo "Process running now in $sv/build/eggnog directory."
+echo "(Process running now in $sv/build/eggnog directory.)"
 
 aptop=$sv/apache2			# apache top
+export EGG="--home $aptop"		# so we get $aptop config files
 nsf=$sv/build/eggnog/td_egnapa_public	# new server files
 apctl=~/init.d/apache			# apache control script
 
 force=
-[[ "$1" == --force ]] && {		# go even if uncommitted changes exist
+[[ "${1:-}" == --force ]] && {		# go even if uncommitted changes exist
 	force=1
 	shift
 }
 
-Command=$1
+Command=${1:-}
 shift
 case $Command in
 
@@ -289,11 +385,26 @@ import)
 	exit
 	;;
 
+rolltest)				# simple shorthand
+	opt=
+	[[ "$force" ]] &&
+		opt='--force'
+	n2t $opt rollout && n2t test
+	exit
+	;;
+
 rollout)
 	check_changes || {		# lest uncommited changes get lost!
 		echo "$emsg"
 		exit 1
 	}
+	[[ -e "$aptop/eggnog_conf" ]] || {	# if very first rollout, add
+		cp -p $nsf/eggnog_conf $aptop || {	# config to bootstrap
+			echo "Problem initializing eggnog_conf in '$aptop'."
+			exit 1
+		}
+	}
+
 	# xxx there's some bug where an uncommitted hg id ends up in
 	# td_egnapa_public/logs/dvcsid, and messes up blib t/service_n2t.t
 	# tests until blib t/apachebase.t is run
@@ -304,6 +415,7 @@ rollout)
 		echo "$b_out"
 		exit 1
 	}
+
 	check_minders		# if there are minders, copy them in
 
 	make || {		# "make" again, in case "import" wasn't done
@@ -332,6 +444,7 @@ rollout)
 	$apctl graceful-stop 	# proceed even if old server is damaged
 	(time n2t_rollout) 2> .rolltime || {
 		echo "Problem with rollout."
+		cat .rolltime
 		# If we time out after 15 seconds, $? will not be zero.
 		# Y is default.
 		read -t 15 -p "Rollback to previous? [Y/n] "
@@ -384,6 +497,48 @@ test)
 	# NB: do NOT use perl's -Mblib option, which tests UNINSTALLED code.
 	#
 	perl t/egn_post_install_n2t.t
+	exit
+	;;
+
+cfq)
+	perl -Mblib egg cfq "$@"
+	exit
+	;;
+
+ezid|oca|yamz|ncpt|idra|pfx)
+	perl -Mblib egg -d $aptop/binders/$Command --user $Command \
+		--isolator public "$@"
+	exit
+	;;
+
+cron)
+	subcmd=${1:-check}
+	cd $n2t_service_dir
+	if [[ "$subcmd" == on && -e cronstop ]]
+	then
+		rm cronstop || {
+			echo Problem removing $n2t_service_dir/cronstop file
+			exit 1
+		}
+	elif [[ "$subcmd" == off && ! -e cronstop ]]
+	then
+		crontab -l | sed 's/^/#/' > cronstop || {
+			echo Problem creating cronstop file in $n2t_service_dir
+			exit 1
+		}
+		echo "Creating blanket $n2t_service_dir/cronstop file;" \
+			"edit it to selectively re-enable services."
+	else			# assume "check" (status check)
+		[[ -e cronstop ]] && {
+			echo "Crontab disabled by cronstop. Do" \
+				"\"n2t cron on\" to re-enable."
+			exit 0
+		}
+		echo "Crontab enabled. No cronstop file exists. Do" \
+			\"n2t cron off\" "to disable."
+		exit 1
+	fi
+	make crontab
 	exit
 	;;
 

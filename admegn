@@ -1,25 +1,24 @@
 #!/bin/bash
 
-# defined service/deployment classes and hostnames
-classfmt="CLASS CANONICAL_NAME OTHER_NAMES ..."
-hostclass=(
-    -dev    n2t-dev.n2t.net ids-n2t-dev.n2t.net
-    -stg    n2t-stg.n2t.net ids-n2t-stg-2{a,b,c}.n2t.net
-    -prd    n2t.net ids-n2t-prd-2{a,b,c}.n2t.net
-    -mac    jak-macbook.local
-)
-
 # xxx do a system version of this, eg, EGNAPA_NOTIFY?
 notify=jak@ucop.edu	# xxx backup, sysupdate, or other failure
+
+# Add TMPDIR because of Berkeley DB performance with default "/"
+export TMPDIR=~/backups
 
 me=$( basename $0 )
 function usage {
 
 summary="
-     $me mong [-v] [status | [hard-]stop | [re]start | start1 | repltest [N]]
-     $me class [ Host | list ]
-     $me mdump [ -v ] [ Minter/nog.bdb ... ] [ > MinterStates ]
-     $me mload [ -nv ] Dir [ < MinterStates ]
+     $me warts
+     $me binder_load Dbdir [ Dbdump_file ]
+     $me bsync RemoteHost
+     $me bstat [ Binder ... ]
+     $me msync RemoteHost
+       $me mdump [ -v ] [ Minter/nog.bdb ... ] [ > MinterStates ]
+       $me mload [ -nv ] Dir [ < MinterStates ]
+     (from backup) db_dump egg.bdb | ssh \$HOST '(cd \$dbdir; db_load egg.bdb)'
+     $me cert_check [ restart | notify | '' ]
      $me validate_naans [ NAANsFile ]
      $me rcheck [ -v ]
      $me rstat IdPattern Logfile ...
@@ -37,42 +36,116 @@ summary="
 	cat << EOT
 
 SYNOPSIS                          ($0)
-       $me - admin tool for eggnog
+       $me - admin tool for Eggnog (essentially N2T)
 
 USAGE $summary
 
 DESCRIPTION
+       NB: for the moment, this script assumes it is correct to always
+       call Eggnog services with --service n2t.
+
        The $me tool performs various administrative tasks for the eggnog
        server database running under the "svu" service version that is
        currently in effect (or "cur" if none -- type "svu" for details).
        The -v option makes it more verbose for some forms.  A non-zero
        exit status indicates an error.
 
-       The "mong" form takes one argument to deal with the Mongo DB service.
-       Given "status" it reports if the service (daemon) is up or down, and
-       returns a testable process status.  With "repltest", it starts up
-       and tests a number of replicas.  With "start1", it starts the service
-       as a single, non-replicated instance, suppressing any default replica
-       set configuration.  Otherwise the argument instructs the script to
-       start, stop, or restart the service.  Use -v to make it verbose.
+       Some important services are best done with other tools. For example,
+       to migrate an entire binder to a new system, change into a quiescent
+       ezid binder directory (one with the egg.bdb file in it), usually a
+       recent backup copy. Then do something like
 
-       The "class" form prints the service class (dev, stg, prd, mac) and
-       canonical hostname of the given Host (the current host by default).
-       If the first argument is "list", it prints a list of known hosts
-       and classes.
+        \$ export TMPDIR=~/backups
+        \$ rhost=n2t@ids-n2t2-prd.n2t.net
+        \$ dbdir=sv/cur/apache2/binders/egg_n2t_prd_public.real_ezid_s_ezid
+        \$ ssh \$rhost "( cd \$dbdir; rm log.* __db.* )"
+        \$ db_dump egg.bdb | ssh \$rhost \\
+	       "( cd \$dbdir; TMPDIR=~/backups db_load egg.bdb )"
+
+       If you don't clean up the remote \$dbdir directory beforehand by
+       removing egg.bdb and any __db.* and/or log.* files, bad things
+       can happen when they interfere with the new environment. Also,
+       bad things might happen if you're loading a new binder that will
+       be used as it is appearing, so you might want to turn off apache.
+
+XXX do a binder_backup_list command that lists the latest clean backup of each binder,
+
+XXX do a binder_dump command that takes a timestamped clean binder backup,
+creates a timestamped dump of it, suggests a next harvest: entry
+
+       xxx this is awkward
+
+       Also, you could have the dump file locally and call
+
+        \$ admegn binder_load \$dbdir db_dump_file
+       or
+        \$ admegn binder_load \$dbdir < db_dump_file
+
+       xxx it should restart apache afterwards, right? (why?)
+           should it disable cron during that time too?
+
+       XXX needed?
+       The "warts" form takes the ~/warts/env.sh bash scripts and creates a
+       corresponding ~/warts/env.yaml form of its settings (in YAML format).
+
+       The "bsync" form updates the local host's binders with the binders'
+       states found on the RemoteHost (eg, n2t@ids-n2t-prd-2a.n2t.net).
+       NB: this command starts by reading the "next harvest" time (as a
+       TEMPER timestamp) at the end of the remote ~/logs/iddumper_log file,
+       reading transaction records from that time to the present, and ends by
+       writing the next harvest time back to the end of the iddumper_log file.
+       It goes to RemoteHost and runs "~/tlog/bsync2remote \$LocalHost".
+       Running it every so often (eg, once a day or once an hour) keeps
+       binders in sync. The more frequently it is run, the less work each
+       iteration takes and the sooner it completes.
+
+       The "bstat" form prints vital stats of each listed public Binder,
+       or all public binders if no args are specified. Example:
+
+            \$ $me bstat ezid
+
+       The "msync" form updates the local host's minters with the minters'
+       states found on the RemoteHost (eg, n2t@ids-n2t-prd-2a.n2t.net).
+       It more or less follows the steps outlined below for mdump and mload.
+       Running it every so often (eg, once a day or once an hour) keeps
+       minters in sync. The more frequently it is run, the less work each
+       iteration takes and the sooner it completes.
 
        The "mdump" form writes minter states in ANVL format to stdout.
        If no minters are specified, it looks for minters in a "minters"
        directory under the Apache server root.  If a Minter path is given,
        it should include the eggnog populator, eg, ezid, as in
 
-            \$ $me mdump minters/ezid/ark/?????/*/nog.bdb
+            \$ for p in ezid oca yamz snac
+            > do
+            >     $me mdump minters/\$p/ark/?????/*/nog.bdb > m\$p
+            > done
+            \$ scp mezid moca myamz msnac n2t@ids-n2t2-prd.n2t.net:\$sa/
 
        The "mload" form reads a minter state file written by mdump from
        stdin and brings minters under directory Dir up to date, creating
-       minters as need be.  If -n is given no states will be changed, but
-       proposed changes will be reported.  Dir should have populator
-       subdirectories (ezid, oca, yamz, etc) as immediate descendants.
+       minters as need be. Compared with a brand new minter, bringing a
+       recently updated minter up to date takes much less time. If -n is
+       given, no states will be changed, but proposed changes will be
+       reported. Dir should have populator subdirectories (ezid, oca,
+       yamz, etc) as immediate descendants, for example,
+
+            \$ for p in ezid oca yamz snac
+            > do
+            >     $me mload \$sa/minters < m\$p
+            > done
+
+       The "cert_check" form looks for an updated TLS/SSL certificate (from
+       Let's Encrypt) and, if found, copies it into ~/warts/ssl/n2t.net after
+       creating a backup copy (n2t.net.bak), and then takes the action
+       "restart", "notify", or "" (none), ie, restarting Apache or emailing
+       a notification. A "notify" action may be be useful in a production
+       setting if you wish to do a manual "apache restart", but must be dealt
+       with promptly because an unintended restart (eg, from a system reboot)
+       will use the new cert. To rollback to the old cert, it suffices to
+       rename the n2t.net.bak/ directory to n2t.net/ and do "apache restart".
+       The "cert_check" form is usually called from crontab based on testing
+       for a non-empty value returned by "\$(egg cfq new_cert_action)".
 
        The "validate_naans" form performs consistency and uniqueness checks
        on a NAANsFile containing ANVL-formatted NAAN records, returning a
@@ -150,23 +223,14 @@ DESCRIPTION
        via crontab.
 
 EXAMPLES
-       These commands could be used to migrate all the minters from one
-       system to another.
+       This command could be used to synchronize all the minters on the
+       given remote system to the local system.
 
-            \$ $me mdump > local_state
-            \$ ssh n2t@ids-n2t-prd-2a.n2t.net < local_state \\
-                  "$me mload ~/sv/cur/apache2/minters; $me mdump" \\
-                        > remote_state
-            \$ diff local_state remote_state
+            \$ $me msync n2t@ids-n2t-prd-2a.n2t.net
 
-       This command reboots a host with a server on port 18880.
-       yyy bug? this requires port 18880 to be open
+       This command reboots a remote ssh host while monitoring its server.
 
-            \$ $me bootwatch ids-n2t-prd-2a.n2t.net:18880
-
-       This command reboots a remote server behind a load balancer.
-
-	    \$ $me bootwatch ids-n2t-prd-2a.n2t.net n2t.net
+	    \$ $me bootwatch ids-n2t2-prd.n2t.net n2t.net
 
 
 SUMMARY $summary
@@ -216,453 +280,19 @@ function out_if {
 	return
 }
 
-function repltest {
-	local n=$1 setname=$2		# setsize and setname
-	[[ "$n" == '-' ]] &&		# default number of replicas
-		n=5
-	[[ "$setname" == '-' ]] &&	# default replica set name
-		setname=$tmongo_replset
-	local max=20			# max number of replicas
-	[[ $n == clean ]] && {		# XXXX do this
-		# to purge replica set config completely (leaving user
-		# database), restart each instance/daemon without --replSet
-		# option (and on different port?) and drop the
-		# local.system.replset collection
-		#     mongo local --eval "db.system.replset.drop()"
-		# see http://serverfault.com/questions/424465/how-to-reset-mongodb-replica-set-settings
-		echo rm -fr $tmongo_dbdir
-		rm -fr $tmongo_dbdir	# XXX far too crude? better above?
-		return
-	}
-	# XXX drop the above given that we clan up before every run?
-	echo REMOVING OLD REPLICA SET
-	echo rm -fr $tmongo_dbdir
-	rm -fr $tmongo_dbdir	# XXX far too crude? better above?
-	if [[ ! "$n" =~ ^[0-9][0-9]*$ || $n -ge $max || $n -lt 1 ]]
-	then
-		echo "error: replica count ($n) should be 'clean' or an odd" \
-			"positive integer < $max"
-		return 1
-	fi
-
-	mkdir -p $tmongo_dbdir
-	local port out args instance host
-	host=$( hostname -f )	# host where daemon will run
-	local repSetHosts=''		# list of servers in replica set
-	local members=''		# server members of replica set
-	# members needed?
-
-	echo Starting $n servers with --replSet $setname
-	local i=1
-	while [[ $i -le $n ]]	# start up all replicas
-	do
-		(( port=$tmongo_port + $i ))
-		dbpath=$tmongo_dbdir/d$i
-		args="$port $dbpath $tmongo_dblog $tmongo_replset $n"
-		[[ "$verbose" ]] &&
-			echo "Instance $i: mongodaemon start $args"
-		mongodaemon start $args		# start daemon
-		instance="$host:$port"
-		repSetHosts+=",$instance"	# push onto replica list
-		#[[ $i -ne $n ]] &&		# if not final, push onto
-		#	repSetAdd+=";rs.add('$instance')"	# add list
-		repSetAdd+=";rs.add('$instance')"	# add to list
-		(( i++ ))
-	done
-
-	# At this point, $port is the port number of the final instance
-	# (all on localhost right now).  Now initiate the replica set by
-	# connecting to that final instance and running rs.initiate().
-	#
-	local final=$port rsinit
-
-	#members+="
-	#	{'_id' : $j, 'host' : '$instance', 'stateStr' : 'PRIMARY'},"
-	#rsinit="rs.initiate({ '_id' : '$setname', 'members' : [ $members ] })"
-
-	echo "Doing rs.initiate() on server at $host:$final"
-	out=$( mongo --port $final --eval "rs.initiate()" )
-	out_if $? error "$out"
-	[[ "$verbose" ]] && {
-		echo "rs.intiate():"
-		echo "$out"
-	}
-
-	echo "Doing $n calls to rs.add(...)"		# ... in a long string
-	[[ "$verbose" ]] &&	echo "$repSetAdd"
-	out=$( mongo --port $final --eval "$repSetAdd" )
-	out_if $? error "$out"
-	[[ "$verbose" ]] && {
-		echo "$repSetAdd:"
-		echo "$out"
-	}
-
-	[[ "$verbose" ]] && {
-		echo === Replica set status after adding replicas ===
-		mongo --port $final --eval "rs.status()"
-	}
-
-	# yyy need to pause really?
-	local s=2	# number of seconds to pause while replicas wake up
-	echo Sleep $s seconds to let servers stand up...
-	sleep $s
-
-	# To add data, construct the connection string, repSetURL.
-	#
-	local readpref=nearest
-	#local readpref=primaryPreferred
-	local repSetURL='mongodb://'	# build replica set URL in pieces
-	repSetURL+=${repSetHosts/,/}	# strip initial comma from set list
-	repSetURL+="/?replicaSet=$tmongo_replset"	# specify set name
-	repSetURL+="&socketTimeoutMS=30000"	# wait up to 30 secs for reply
-	# XXX commented out maxTimeMS setting for now because it triggers
-	#     and error message even though the connection seems to succeed
-	#     The perl module docs say this is an important attribute to
-	#     set, so we want to uncomment this next line when we figure
-	#     out what's wrong (eg, a module bug gets fixed?)
-	#repSetURL+="&maxTimeMS=15000"	# wait up to 15 secs to do DB command
-			# NB: maxTimeMS must be shorter than socketTimeoutMS
-	repSetURL+="&readPreference=$readpref"	# replica to read from
-
-	# generate data ($fate) containg date to get different data each run
-	local fate="timely data $( date )"
-	local perl_add_data
-	read -r -d '' perl_add_data << 'EOT'
-
-	# start embedded Perl program
-	# takes two arguments: connection_string and test data_string
-	use strict;
-	use MongoDB;
-	use Try::Tiny;		# for exceptions
-	use Safe::Isa;		# provides $_isa
-	# use Try::Tiny::Retry	# yyy (one day) for automatic retries
-
-	my $connection_string = $ARGV[0] || '';
-	my $data_string = $ARGV[1] || '';
-	my $client;
-	try {
-		$client = MongoDB::MongoClient->new(
-			host => $connection_string,	# mongodb://...
-		);
-	}
-	catch {
-		print STDERR "error: $_\n";
-
-	};
-	# xxx add these attributes when support is ready
-		#ssl => {		# XXX enable SSL!!
-		#	SSL_ca_file	=> "xxx",
-		#	SSL_cert_file	=> "xxx",
-		#}
-	$client or
-		print(STDERR "error: couldn't connect to $connection_string"),
-		exit 1;
-	my ($pfx, $docs);
-	try {		# xxx wrong ns
-		$pfx = $client->ns("test.prefixes");	# "prefixes" collection
-		$pfx->insert({ name => "JDoe", fate => "$data_string" });
-		$docs = $pfx->find();
-	}
-	catch {
-		print STDERR "error: $_\n";
-	};
-	while (my $doc = $docs->next) {
-		print "$doc->{'fate'}\n";	# save for testing replicas
-	}
-	# end embedded Perl program
-
-EOT
-
-	# Now call the script, just saved in $perl_add_data, pass in values
-	# via command line arguments.
-	#
-	out=$( perl -we "$perl_add_data" "$repSetURL" "$fate" )
-	local doclen=${#fate}
-	[[ "$out" != "$fate" ]] && {
-		echo "Warning: doc stored (len $doclen) not read from" \
-			"$readpref replica (len ${#out})"
-	}
-
-	local stored_doc
-	if [[ $? -eq 0 ]]
-	then
-		stored_doc=$fate
-		echo "Test document data of length $doclen added:"
-		sed 's/^/    /' <<< "$stored_doc"	# indent data
-	else
-		echo "problem adding test document via $repSetURL"
-		echo "$out"
-	fi
-
-	[[ "$verbose" ]] && {
-		echo === Replica set status after inserting document ===
-		mongo --port $final --eval "rs.status()"
-	}
-
-	echo Sleep 5 to let data propagate
-	sleep 5
-	# now stop each replica after proving data written to each one
-	i=1; while [[ $i -le $n ]]
-	do
-		(( port=$tmongo_port + $i ))
-		out=$( mongo --port $final --quiet \
-			--eval "db.prefixes.find()" test )
-
-		if [[ $? -eq 0 ]]
-		then
-			fgrep -sq "$stored_doc" <<< "$out"
-			if [[ $? -eq 0 ]]
-			then
-				echo -n "Replica $port has doc copy, "
-			else
-				echo -n "Replica $port does not" \
-					"have doc copy, "
-			fi
-		else
-			echo "problem fetching test docs (port $final)"
-			echo "$out"
-		fi
-
-		dbpath=$tmongo_dbdir/d$i
-		#args="$port $dbpath $tmongo_dblog $tmongo_replset $n"
-		args="$port $dbpath $tmongo_dblog"
-		[[ "$verbose" ]] &&
-			echo "Instance $i: mongodaemon stop $args"
-		# We don't need most of those args for "stop" except $port,
-		# but we supply them to satisfy mongodaemon syntax checker.
-		#
-		out=$( mongodaemon stop $args )
-		if [[ $? -ne 0 ]]
-		then
-			echo error: problem stopping server with \
-				mongodaemon stop $args:
-			echo "$out"
-			echo Trying hard-stop
-			out=$( mongodaemon hard-stop $args )
-			if [[ $? -ne 0 ]]
-			then
-				echo error: problem stopping server
-				echo "$out"
-				echo Giving up
-			else
-				echo "$out"
-			fi
-		else
-			echo "$out"
-		fi
-		(( i++ ))
-	done
-	# yyy now purge replica set config completely?
-}
-
-# Mongo database settings
-#
-#mongo_dbpath=$HOME/sv/cur/apache2/pfx
-mongo_dbdir=$HOME/sv/cur/apache2/mongo_dbdir		# XXX not used!
-mongo_dbpath=$mongo_dbdir				# data goes here
-mongo_dblog=$HOME/sv/cur/apache2/logs/mongod_log	# logs go here
-mongo_port=27017					# daemon port
-mongo_replset=rs0					# replica set name
-mongo_other="--fork --logappend"			# other flags
-mongo_other+=" --storageEngine wiredTiger"
-#--bind_ip 'localhost,172.31.23.24'	# no space after comma
-#--rest		# deprecated since 3.2: admin UI: http://localhost:28017
-
-# Test Mongo database settings
-#
-tmongo_dbdir=$HOME/sv/cur/apache2/tmongod
-tmongo_dbpath=
-tmongo_dblog=$tmongo_dbdir/log
-tmongo_replset=rst			# test replica set name
-tmongo_port=47017			# 20K more than standard port
-tmongo_other="$mongo_other"
-
-# Single port argument required.
-# quietly tests if mongod is running, returns via process status
-function is_mongo_up () {
-	local port=$1
-	nohup mongo --port $port < /dev/null > /dev/null 2>&1
-}
-
-# Arguments described in comments
-# first arg is action, eg, start, stop
-#	--dbpath $mongo_dbpath		# data goes here
-#	--logpath $HOME/sv/cur/apache2/logs/mongod_log	# logs go here
-#	--port $mongo_port
-#	--replSet $mongo_replset	# replica set "rs0"
-#	#dbpath logpath port replset
-function mongodaemon () {
-	local cmd=$1
-	if [[ "$cmd" == repltest ]]
-	then
-		# yyy $setname is an undocumented arg in $3
-		local setsize=$2 setname=$3
-		# The repltest function calls back to this function.
-		repltest "$setsize" "$setname"
-		return
-	fi
-	local port=$2 dbpath=$3 dblog=$4 setname=$5 setsize=$6
-	[[ "$cmd" && "$port" && "$dbpath" && "$dblog" ]] || {
-		echo "error: usage:" \
-			"mongodaemon cmd port dbpath dblog [replsetname [n]]"
-		return 1
-	}
-
-	[[ "$port" == '-' ]]	&& port=$mongo_port	# default port
-	[[ "$dbpath" == '-' ]]	&& dbpath=$mongo_dbpath	# default dbpath
-	[[ "$dblog" == '-' ]]	&& dblog=$mongo_dblog	# default dblog
-
-	# XXX plan to change to using REPLICAS BY DEFAULT
-	local replicas=		# default: no replicas
-	[[ "$setname" ]]	&& replicas="--replSet $setname"
-
-	[[ "$cmd" == start1 ]] &&			# if start1 command
-		replicas=''				# force no replicas
-
-	[[ "$port" =~ ^[0-9][0-9]*$ ]] || {
-		echo "error: port ($port) must be a number or '-'"
-		return 1
-	}
-	[[ -d $dbpath ]] || mkdir $dbpath || {
-		echo "error: cannot create directory $dbpath"
-		return 1
-	}
-	local flags=(			# inline mongod config file
-		--dbpath $dbpath --logpath $dblog --port $port
-		$replicas $mongo_other
-	)
-
-	local out=
-	ulimit -n 4096		# set a higher limit than mongod assumes
-
-	case $cmd in
-	start*)				# matches start or start1
-		is_mongo_up $port
-		if [[ $? -eq 0 ]]
-		then
-			echo "mongod appears to be up already"
-			return
-		fi
-		# start in background
-		out=$( mongod ${flags[*]} )
-		if [[ $? -eq 0 ]]
-		then
-			echo "mongod OK (port $port) -- started"
-			return 0
-		else
-			echo "mongod $cmd NOT OK"
-			echo "$out"
-			return 1
-		fi
-		;;
-
-	stop|graceful-stop|hard-stop)
-		local force= stopped=stopped
-		[[ "$cmd" == hard-stop ]] && {
-			force="{ 'force' : 'true' }"
-			stopped=hard-stopped
-		}
-		cmd=stop
-		is_mongo_up $port
-		if [[ $? -ne 0 ]]
-		then
-			echo "mongod (port $port) appears to be down already"
-			return
-		fi
-		#local try1 try2
-		out=$( mongo --port $port \
-			--eval "db.shutdownServer($force)" admin )
-		if [[ $? -eq 0 ]]
-		then
-			echo "mongod OK (port $port) -- $stopped"
-			[[ $verbose ]] && echo "$out"
-			return 0
-		else
-			echo "problem shutting down mongod (port $port)"
-			echo "$out"
-			return 1
-		fi
-		;;
-
-	restart|graceful|hard-restart)
-		cmd=restart
-		is_mongo_up $port
-		if [[ $? -ne 0 ]]
-		then
-			echo "mongod (port $port) appears to be down"
-		else
-			# xxx change echo pipe to --eval opt
-			out=$( echo -e "use admin \n db.shutdownServer()" |
-				mongo --port $port )
-			if [[ $? -eq 0 ]]
-			then
-				echo "mongod OK (port $port) -- stopped"
-			else
-				echo "mongod shutdown NOT OK"
-				echo "$out"
-			fi
-		fi
-		sleep 1		# pause seems to help here under Linux
-		mongod ${flags[*]} > /dev/null	# start in background
-		if [[ $? -eq 0 ]]
-		then
-			echo "mongod OK (port $port) -- restarted"
-			return 0
-		else
-			echo "mongod $cmd NOT OK"
-			return 1
-		fi
-		;;
-
-	status)
-		pidcount=`netstat -an | grep -c "mongodb.*$port"`
-		is_mongo_up $port
-		local status=$?
-		if [[ $status -eq 0 ]]
-		then
-			echo "OK -- running (mongod, port $port)"
-			[[ "$pidcount" -eq 0 ]] &&
-				echo "WARNING: but the pidcount is $pidcount?"
-			[[ "$verbose" ]] && {
-				echo "=== Mongo Configuration ==="
-				mongo --port $port --eval "db.serverStatus()"
-				echo "=== Mongo Replica Set Configuration  ==="
-				mongo --port $port --eval "rs.conf()"
-				echo "=== Mongo Replica Set Status  ==="
-				mongo --port $port --eval "rs.status()"
-			}
-				
-		else
-			echo "NOT running (mongod, port $port)"
-			[[ "$pidcount" -ne 0 ]] &&
-				echo "WARNING: but the pidcount is $pidcount?"
-		fi
-		return $status
-		;;
-
-	*)
-		[[ "$cmd" ]] &&
-			echo "mong: $cmd: unknown argument"
-		echo "Use one of these as an argument:" \
-			"status, start[1], stop, restart, or repltest."
-		return 1
-		;;
-
-	esac
-}
-
 function mdump {
 
 	if [[ $# -gt 0 ]]
 	then
 		minters=( $@ )
 	else
-		[[ "$ap_top" ]] || {
+		[[ "$aptop" ]] || {
 			echo "Error: no apache server root found. You must" \
 				"specify minter paths explicitly."
 			exit 1
 		}
-		minters=( $ap_top/minters/*/ark/?????/*/nog.bdb )
+		minters=( $apminters/*/ark/?????/*/nog.bdb )
+		#minters=( $aptop/minters/*/ark/?????/*/nog.bdb )
 	fi
 	# First line of output identifies time and server.
 	# xxx Probably should use xargs
@@ -711,7 +341,7 @@ function mload {
 		print("Error line $line: bad header: $_\n"),
 		next;
 	my ($populator, $naan, $shdr) = $header =~
-			m{([^/]+)/ark/(\w\w\w\w\w)/(\w*)/nog\.bdb$} or
+			m{([^/]+)/ark/(\w\w\w\w\w)/([^/]*)/nog\.bdb$} or
 		print("Error line $line: header must be of form ",
 				"Populator/ark/NAAN/Shoulder: $header\n"),
 		next;
@@ -878,10 +508,140 @@ EOT
 		perl -00 -wne "$perl_mload"
 }
 
+# load local binder from scratch using BDB dump on stdin
+
+function binder_load {
+
+	local dbdir=${1:-}
+	local dbdump=${2:-}
+	[[ ! "$dbdir" ]] && {
+		echo "Error: no binder directory specified" 1>&2
+		return 1
+	}
+
+	# $rbdr, $obdr, and $files are relative to $dbdir/..
+	local rbdr=$( basename $dbdir )	# relative (no path) binder name
+	local obdr=old/$rbdr		# old binder name (for backup)
+	local files=(
+		$obdr/{0=egg_1.00,0=pairtree_1.02,egg.rlog}
+		$obdr/{egg_lock,egg_README,pairtree_root}
+	)
+
+	echo "ALERT: Disabling crontab. Remember to re-enable when done!"
+	n2t cron stop
+
+	if [[ -e $dbdir ]]
+	then
+		(cd $dbdir/..	# in subshell so we get original CWD later
+			# old binder directories go here; should exist always
+			mkdir -p old	# yy should move to n2t init step
+			rm -fr $obdr	# only keep one single backup
+			mv $rbdr $obdr
+			mkdir $rbdr
+			for f in "${files[@]}"
+			do
+				[[ ! -e $f ]] &&
+					continue
+				cp -pr $f $rbdr
+			done
+		)
+	else
+		mkdir $dbdir
+		# yyy oops, what about our egg_README, etc. files?
+	fi
+
+	# NB: make sure TMPDIR env var is other than "/"
+	local tail		# hopefully a timestamp from name in $dbdump
+	if [[ "$dbdump" ]]	# recommended, since you can have a backup date
+	then
+		tail=$( basename $dbdump )	# hopefully timestamped name
+		(cd $dbdir	# subshell so $dbdump path is from caller view
+			date > FROM_BACKUP_$tail
+			db_load egg.bdb
+		) < $dbdump
+	else
+		tail="date_unknown"
+		(cd $dbdir
+			date > FROM_BACKUP_$tail
+			db_load egg.bdb
+		) # from STDIN
+	fi
+	[[ $( apache status ) =~ ^UP ]] && {
+		echo "You should probably restart apache now."
+	}
+	cat << EOT
+
+NB: To keep the loaded binder in sync with a remote binder, enter the TEMPER
+(eg, 2020.07.30_02:37:01) timestamp of the snapshot in the last two-line entry
+of the remote host's ~/logs/iddumper_log file. For this snapshot the timestamp
+appears to be "$tail". Example last two lines:
+
+# ======== start from date of full binder db_dump
+# next harvest: 2020.08.04_02:37:01 /apps/n2t/sv/cur/apache2/logs/transaction_log
+
+** If apache was running during loading, you should do "apache restart" now. **
+EOT
+}
+
+# sync (update) local minters to catch up with source state of remote minters
+
+function msync {
+
+	local ruserhost=${1:-}
+	[[ ! "$ruserhost" ]] && {
+		echo "Error: no remote host specified" 1>&2
+		return 1
+	}
+	echo "# ---- $me msync:" $( date '+%Y.%m.%d_%H:%M:%S' ) "----"
+	ssh -n $ruserhost "(
+		cd ~/sv/cur/apache2
+		for p in ezid oca yamz snac
+		do
+			admegn mdump minters/\$p/ark/?????/*/nog.bdb
+		done
+	)" | admegn mload $apminters
+}
+
+# sync (update) local binders to catch up with source state of remote binders
+# run this every 10 mins?
+
+function bsync {
+
+	local ruserhost=${1:-}
+	[[ ! "$ruserhost" ]] && {
+		echo "Error: no remote host specified" 1>&2
+		return 1
+	}
+	localhost+=$( hostname -f )
+	echo "# ---- $me bsync:" $( date '+%Y.%m.%d_%H:%M:%S' ) "----"
+	echo "# running ssh -n $ruserhost 'tlog/bsync2remote n2t@$localhost'"
+	ssh -n $ruserhost "tlog/bsync2remote n2t@$localhost"
+
+	# XXX kludge -- make this work for all binders
+	echo "#    after bsync EZID" "$( admegn bstat ezid | grep bindings )"
+	echo "#    after bsync OCA " "$( admegn bstat oca  | grep bindings )"
+	echo
+
+}
+
+# show vital stats
+
+function bstat {
+
+	[[ ${#*} -eq 0 ]] && {
+		echo All binders -- not implemented
+		exit 1
+	}
+	for b in $@
+	do
+		n2t $b mstat
+	done
+}
+
 # these sources usually overridden during pfx validation
 #
 ShouldersFile=~/shoulders/master_shoulders.txt	# default
-NAANsFile=~/shoulders/naans/master_naans	# default
+NAANsFile=~/naans/master_naans	# default
 
 function validate_naans {
 
@@ -1079,16 +839,61 @@ EOT
 	return
 }
 
-function rcheck {
+# Doc for script /home/cdlinfra/ssl/script/cert_sync.sh at
+# https://confluence.ucop.edu/display/CUG/SSL+Certificate+Management+Users+Guide
 
+# Note: new certs are valid for 90 days.
+
+function cert_check {
+
+	local arg out cmd subject
+	arg="${1:-}"
+	[[ ! "$arg" ]] &&
+		return 0		# no command means no-op, no action
+
+	echo -n "+---- new cert check" $( date )	# no newline yet
+
+	case $arg in
+	restart)
+		cmd="$HOME/init.d/apache restart"
+		;;
+	notify)
+		subject='new cert: manual "apache restart" advised'
+		cmd="mail -s '$subject' $notify"
+		;;
+	*)
+		echo
+		echo "error: $0 cert_check $arg: unknown command arg"
+		return 1
+		;;
+	esac
+
+	# /dev/null terminates any mail input
+	out=$( /home/cdlinfra/ssl/script/cert_sync.sh \
+		--outdir $HOME/warts/ssl/n2t.net \
+		--restartcmd "$cmd" \
+		"$( hostname -f )" \
+		< /dev/null \
+	)
+	if [[ "$out" ]]
+	then
+		echo
+		echo "$out"
+	else
+		echo ": no updates"
+	fi
+	return
+}
+
+function rcheck { 
 	local i t itcnt got errcnt=0 msg=''
 	local array i_t_pairs=(			# identifier/target pairs
 	  'ark:/12345/fk1234'
-		'http://www.cdlib.org/services'
+		'https://cdlib.org/services'
 	  'ark:/12345/fk1235'
-		'http://en.wikipedia.org/wiki'
+		'https://en.wikipedia.org/wiki'
 	  'ark:/12345/fk3'
-		'http://www.google.com/#q='
+		'https://www.google.com/search?q='
 	)
 	(( itcnt=(${#i_t_pairs[@]} / 2) ))
 
@@ -1101,9 +906,9 @@ function rcheck {
 	do
 		[[ "${#i_t_pairs}" -eq 0 ]] &&		# if list now empty
 			break				# we're done
-		i="${i_t_pairs[0]}"
+		i="${i_t_pairs[0]}"			# save first pair
 		t="${i_t_pairs[1]}"
-		i_t_pairs=( ${i_t_pairs[@]:2} )
+		i_t_pairs=( ${i_t_pairs[@]:2} )		# drop first pair
 		got=$( wegn locate "$i" |
 			sed -ne 's/^Location: *//p' -e '/[Ee]rror/p' )
 		[[ "$verbose" ]] && {
@@ -1124,8 +929,10 @@ expected: $t
 	}
 	[[ "$msg" ]] && {
 		local subject="resolver health check report"
-		[[ $errcnt -gt 0 ]] &&
-			subject="CRITICAL: $errcnt resolver errors"
+		[[ $errcnt -gt 0 ]] && {
+			local sname=$( egg --home $aptop cfq shell_name )
+			subject="CRITICAL: $sname: $errcnt resolver errors"
+		}
 		mail -s "$subject" $notify <<< "$msg"
 	}
 	[[ $errcnt -eq 0 ]] &&
@@ -1170,6 +977,7 @@ function rstat {
 	my %h;		# hash for counting
 	my ($key, $mon, $yyyy);
 	my $pat = $ENV{ADMEGN_IDPAT};	# might be empty
+	my $pat_orig = $pat;
 	my $rpat;			# regex version of $pat
 	$pat and $rpat = qr/$pat/;	# if non-empty, assume it's a regex
 	my $alogformat;			# access_log format?
@@ -1197,9 +1005,10 @@ function rstat {
 				# future.  First remove any ark:/ that the
 				# caller might have entered (makes sense),
 				# then add the possibility of the future log
-				# format recording ark:/.  Remember that
-				# $pat may be empty.
+				# format recording ark:/.  Remember to re-init
+				# for each file and that $pat may be empty.
 				#
+				$pat = $pat_orig;		# re-init
 				$pat =~ s|^.*/?ark:/?||;	# if any
 				$pat =~ s|^|BEGIN resolve (?:ark:/)?|;
 				$rpat = qr/$pat/;
@@ -1350,7 +1159,7 @@ function sysupdate {
 	local makecache updates noise count
 	makecache=$( yum makecache fast )		# update repo metadata 
 	updates=$( yum check-update | grep -v '^Loaded plugins' )
-	noise=$( egrep '^db|perl|mongodb' <<< "$updates" )
+	noise=$( egrep '^db|perl' <<< "$updates" )
 	count=$( grep -c '.' <<< "$updates" )	# non-empty lines
 
 	echo -n "+==== sysupdate start: "		# for log file
@@ -1412,6 +1221,20 @@ function sysupdate {
 	# If we get here, do the update
 	local msg
 	msg=$( sudo yum $dontask update )
+
+#	# AWS yum updates of mongod automatically enable mongod on reboot,
+#	# which creates socket file owned by mongod that we can't remove
+#	# without superuser powers. So make sure mongod is always disabled,
+#	# after any system update.
+#
+#	ls -l /tmp/mongo*		# check permissions before intervention
+#
+#	sudo /usr/bin/systemctl stop mongod
+#	sudo /usr/bin/systemctl disable mongod
+#	sudo /usr/bin/systemctl status mongod
+#
+#	ls -l /tmp/mongo*		# check permissions after intervention
+
 	echo "$msg"
 	echo 'Restarting apache and running "n2t test"'
 	~/init.d/apache restart || {
@@ -1477,7 +1300,7 @@ function logdelete {
 	return 0
 }
 
-function class {
+function xxxclass {
 
 	source ~/warts/env.sh
 	local Host=${1:-$EGNAPA_HOST}
@@ -1515,11 +1338,11 @@ function class {
 			return 0
 		}
 	done
-	echo "Host \"$Host\" not found.  Try \"$me list\"."
+	echo "Host \"$Host\" not found.  Try \"$me class list\"."
 	return 1
 }
 
-# Some common log directories: $ap_top/logs, ~/.eggnog/logs 
+# Some common log directories: $aptop/logs, ~/.eggnog/logs 
 # Filenames of the form transaction_log.N contain log intervals, the smaller
 # the value of N, the younger it is, eg, youngest to oldest:
 #    transaction_log
@@ -1530,7 +1353,7 @@ function class {
 
 function logrename {
 
-	local dir=${1:-$ap_top/logs}		# default
+	local dir=${1:-$aptop/logs}		# default
 	local t=transaction_log
 	local mtime suffix raw_ls
 	local sorted=()
@@ -1583,8 +1406,6 @@ function backup {
 	now=$( date '+%Y.%m.%d_%H:%M:%S' )
 	local src dst took
 	local txnlog=~/sv/cur/apache2/logs/transaction_log.rlog
-	local pfx_work=~/sv/cur/apache2/pfx_work
-	local pfx_harvest=~/pfx_harvest
 
 	echo ==== creating backups $(date) ====
 	# make sure our base directories are set up; quell complaints
@@ -1597,55 +1418,105 @@ function backup {
 	dst=~/backups/shoulders/$now
 	echo Backing up shoulders and transaction_log to $dst.
 	mkdir $dst
-	cp -Lpr ~/shoulders/* ~/sv/cur/apache2/logs/transaction_log.rlog $dst
+	#cp -Lpr ~/shoulders/* ~/sv/cur/apache2/logs/transaction_log.rlog $dst
+	cp -Lpr ~/sv/cur/apache2/logs/transaction_log $dst
 	# xxx ouch, these are big logs, getting backed up with shoulders
+	[[ -e ~/naans ]] && {
+		cp -Lpr ~/naans/{main_naans,candidate_naans,shoulder_registry} $dst >& /dev/null
+	}
+	# xxx not actually backing up shoulders
 
 	dst=~/backups/prefixes/$now
 	echo Backing up prefixes to $dst.
-	mkdir $dst
-	cp -Lpr $pfx_work $pfx_harvest $dst
+	mkdir -p $dst
+	pfx backup $dst
+
+	# old:
+	#	local pfx_work=~/sv/cur/apache2/pfx_work
+	#	local pfx_harvest=~/pfx_harvest
+	#	cp -Lpr $pfx_work $pfx_harvest $dst
 
 	echo Backing up binders.
-	local binders
-	binders=$( shopt -s nullglob; echo ~/binders/* )
+	local binders bkubinders user
+	binders=$( shopt -s nullglob; echo $apbinders/* )
+	bkubinders=				# backed-up binders, pass 1
+
 	for binder in $binders
 	do
 		b=$( basename $binder )
-		[[ $b =~ _test$ || ! -e ~/binders/$b/egg.bdb ]] &&	# skip
-			continue	# if not a binder or not a real binder
-		src=~/binders/$b
-		dst=~/backups/binders/$b/$now
+		user=$(
+			cd $eggnog;
+			perl -Mblib egg --all bpname $b | sed -ne 's/who: *//p'
+		)
+		# Look for reasons not to backup
+		if [[ -e $apbinders/NOBACKUP ||		# skip all binders
+		      -e $apbinders/$b/NOBACKUP ||	# skip this binder
+		      $b =~ _test$ ||			# skip test binders
+		      $b =~ _old$ ||			# skip old binders
+		      ! -e $apbinders/$b/egg.bdb ]]	# random dir that has
+		then					#    no actual binder
+			continue
+		fi
+
+		# In order to be able to run egg against a backup binder,
+		# and because of how egg requires long ugly binder names in
+		# anticipation of flatter database-server-based binder access
+		# (instead of tidy short names made unique by file hierarchy),
+		# we need the long binder name to be the final path component
+		# before the egg.bdb file. The awkward consequence is that the
+		# binder names both the parent and a chile of the timestamped
+		# backup directory.
+
+		src=$apbinders/$b
+		dst=~/backups/binders/$user/$now/$b
+		#dst=~/backups/binders/$b/$now
 		mkdir -p $dst
-		echo db_hotbackup for $b
+		echo Running: db_hotbackup -h $src -b $dst
 		db_hotbackup -h $src -b $dst
+		bkubinders+=" $dst"			# save backed-up binder
 		#took=$( ( time db_hotbackup -h $src -b $dst ) 2>&1 )
 		#echo " " $( sed -n s/real//p <<< "$took" )
 	done
 
 	echo Verifying binder backups.
 	local msg
-	for binder in $binders
+	#for binder in $binders
+	for binder in $bkubinders
 	do
+		#[[ $b =~ _test$ || ! -e ~/binders/$b/egg.bdb ]] &&	# skip
+		#[[ $b =~ _test$ || $b =~ _old$ ||	# skip these and dirs
+		#    ! -e $apbinders/$b/egg.bdb ]] &&	# w.o. real binders
+		#	continue
+		#[[ $b =~ _test$ || ! -e $apbinders/$b/egg.bdb ]] &&	# skip
+		#	continue	# if not a binder or not a real binder
+		#dst=~/backups/binders/$b/$now
+
 		b=$( basename $binder )
-		[[ $b =~ _test$ || ! -e ~/binders/$b/egg.bdb ]] &&	# skip
-			continue	# if not a binder or not a real binder
-		echo db_verify for $b
-		dst=~/backups/binders/$b/$now
-		msg=$( time db_verify $dst/egg.bdb 2>&1 ) || {
-			echo "$msg" > $dst/VERIFY_FAILED
+		echo Running: db_verify $binder/egg.bdb
+		#dst=~/backups/binders/$b/$now/$b
+		#echo Running: db_verify $dst/egg.bdb
+		#msg=$( time db_verify $dst/egg.bdb 2>&1 ) || {
+ 		#msg=$( db_verify $dst/egg.bdb 2>&1 ) || {
+ 		msg=$( db_verify $binder/egg.bdb 2>&1 ) || {
+			#echo "$msg" > $dst/VERIFY_FAILED
+			echo "$msg" > $binder/VERIFY_FAILED
 			echo "$b backup - NOT OK"
 			echo "$msg"
 			mail -s "$b binder backup (removed) failed db_verify" \
 				$notify <<< "$msg"
-			rm -fr $dst		# toss -- backup not useful
+			rm -fr $(dirname $binder)  # toss -- backup not useful
+			#rm -fr $(dirname $dst)	# toss -- backup not useful
 			continue		# don't fall through
 		}
 
 		# Generate a complete list of all its ids.
 		#
+# XXX make complete bindings count available
 		echo "$b backup verified; now saving id list"
-		time egg --home $ap_top -d $dst/egg.bdb list 0 \
-			> $dst/VERIFY_LIST 2>&1
+		#time egg --home $aptop -d $dst/egg.bdb list 0 \
+		#	> $dst/VERIFY_LIST 2>&1
+		time egg --home $aptop -d $binder/egg.bdb list 0 \
+			> $binder/VERIFY_LIST 2>&1
 	done
 
 	return 0
@@ -1656,14 +1527,25 @@ function backup {
 # an integer, max, defining the maximum number that you want to keep,
 # and a directory, dst (usually ending in "weeklies" or "monthlies"),
 # to move the surplus to.
-# Assumes backups live in timestamped subdirs of src and dst.
+#
+# Assumes backups live in subdirs of src and dst, named such that they sort in
+# old-to-new order due to consistent timestamps in names, eg, under minters,
+#     2020.09.06_02:37:01
+#     2020.09.06_14:37:02
+# For binder groups, we assume (sketchily) one binder per populator.
+# Examples for the EZID binder group (under binders/ezid),
+#     2020.09.07_00:47:16/egg_n2t_stg_public.real_ezid_s_ezid
+#     2020.09.07_02:37:02/egg_n2t_stg_public.real_ezid_s_ezid
+# and for the OCA binder group (under binders/oca),
+#     2020.09.07_00:47:16/egg_n2t_stg_public.real_oca_s_oca
+#     2020.09.07_02:37:02/egg_n2t_stg_public.real_oca_s_oca
 
 # If 7th day, move 1 surplus backup to tier 2
 # 	If 4x7th day, move 1 surplus tier 2 backup to tier 3
 # 		Remove any surplus tier 3 backups
 # 	Remove surplus tier 2 backups
 # Remove surplus tier 1 backups
-#
+
 function surplus {
 
 	local cmd=$1
@@ -1680,6 +1562,7 @@ function surplus {
 	}
 
 	shopt -s nullglob
+	# big assumption here that direct descendants are timestamped dirs
 	local dirs=( $src/[12][0-9][0-9][0-9].??.??* )
 
 	local surplus d
@@ -1704,6 +1587,8 @@ function surplus {
 	done
 }
 
+# Strip surplus. Args say when and how many files to keep of each tier type.
+#
 # Usage: splus \
 #	tier1 t1max t12cond \
 #	tier2 t2max t23cond \
@@ -1719,7 +1604,7 @@ function surplus {
 #	    $ splus	$b           10 $day7th \
 #		        $b/weeklies  4  $day28th \
 #		        $b/monthlies 4
-#
+
 function splus {
 
 	local t1bax=$1		# tier1 backups directory
@@ -1771,13 +1656,13 @@ function backup_rotate {
 
 	echo ==== rotating backups on day $dayofyear of year $(date) ====
 	local bbk					# binders
-	for bbk in ~/backups/binders/*
+	for bbk in ~/backups/binders/*		# $bbk is a populator name
 	do
-		[[ $bbk =~ _test$ ]] &&
-			continue	# test binder -- skip
-		[[ ! -e ~/binders/$( basename $bbk )/egg.bdb ]] &&
-			continue	# not a binder -- skip
-
+		#[[ $bbk =~ _test$ ]] &&
+		#	continue	# test binder -- skip
+		#[[ ! -e $apbinders/$( basename $bbk )/egg.bdb ]] &&
+		#	continue	# not a binder -- skip
+		# keep 14 dailies, 4 weeklies, 4 monthlies
 		splus	$bbk           14 	$day7th \
 		        $bbk/weeklies   4  	$day28th \
 		        $bbk/monthlies  4
@@ -1793,6 +1678,10 @@ function backup_rotate {
 		$sbk/weeklies   4  	$day28th \
 		$sbk/monthlies  4
 
+	local pbk=~/backups/prefixes			# prefixes
+	splus	$pbk           14 	$day7th \
+		$pbk/weeklies   4  	$day28th \
+		$pbk/monthlies  4
 	return 0
 }
 
@@ -1802,14 +1691,63 @@ function log_rotate {
 	return 1
 }
 
+# (Re)Make ~/warts/env.yaml if it is out of date wrt ~/warts/env.sh.
+# Setting bash vars in warts is convenient because you can use bash features
+# to do things like variable substitution (eg, references to previously set
+# values, tricky in YAML). But we want a YAML version of those settings
+# because that conforms to Eggnog config file conventions.
+
+function warts2yaml {
+
+	local bashfile=$HOME/warts/env.sh
+	local yamlfile=$HOME/warts/env.yaml
+
+	[[ $yamlfile -nt $bashfile ]] && {
+		echo Nothing to update
+		return
+	}
+
+	# Temporarily put the perl script we'll use in the var $perl_warts,
+	# using a "heredoc" (<<) so we don't have worry about quotes
+	# surrounding it. Use the var right afterwards with perl -E.
+
+	local perl_warts
+	read -r -d '' perl_warts << 'EOT'
+	# start embedded Perl program
+	use strict;
+	sub bash2yaml { my( $bashfile )=@_;
+		my $environment = `bash -c "source $bashfile; env"`;
+		map { /(^(?:EGNAPA|MG)_[^=]+)=(.*)/ and say "$1: \"$2\"" }
+			split /\n/, $environment;
+		return;
+	}
+	say '# File created by "admegn warts".';
+	say '';
+	foreach my $file (@ARGV) {
+		bash2yaml($file);		# outputs to stdout
+	}
+	# end embedded Perl program
+EOT
+
+	# Now call the script just saved in $perl_warts, pass in values
+	# via environment variables, and put file arguments on the end.
+
+	env perl -E "$perl_warts" $bashfile > $yamlfile
+	return
+}
+
 # MAIN
 
 # Pick up whatever SVU mode may be in effect for the caller.
-#
+
 svumode=$( sed 's/^[^:]*://' <<< $SVU_USING )
 [[ "$svumode" ]] ||
 	svumode=cur		# if none, default to "cur"
-ap_top=$HOME/sv/$svumode/apache2
+
+eggnog=$HOME/sv/$svumode/build/eggnog
+aptop=$HOME/sv/$svumode/apache2
+apbinders=$aptop/binders
+apminters=$aptop/minters
 
 cmd=$1			# the first command word is the operation
 shift			# $1 is now first command arg
@@ -1845,13 +1783,30 @@ help|"")
 	usage
 	exit
 	;;
-class)
-	class "$@"
+warts)
+	warts2yaml $@
 	exit
 	;;
-mong)
-	echo ERROR: admegn mong is DEPRECATED
-	#mongodaemon "$@" - - -
+class)
+	echo 'DEPRECATED: use "egg cfq class" instead'
+	exit 1
+	#class "$@"
+	exit
+	;;
+binder_load)
+	binder_load $@
+	exit
+	;;
+msync)
+	msync $@
+	exit
+	;;
+bsync)
+	bsync $@
+	exit
+	;;
+bstat)
+	bstat "$@"
 	exit
 	;;
 mdump)
@@ -1860,6 +1815,10 @@ mdump)
 	;;
 mload)
 	mload $@
+	exit
+	;;
+cert_check)
+	cert_check "$@"
 	exit
 	;;
 validate_naans)
@@ -1935,7 +1894,8 @@ error_check)
 		fi
 	if [[ ! -z "$1" && ! -z "$errors" ]]
 	then
-		class=$( admegn class )
+		#class=$( admegn class )
+		class=$( egg cfq class )	# xxx egg must be installed
 		mail -s "$class system log messages" $1 <<< "$errors"
 	elif [[ ! -z "$errors" ]]
 	then
@@ -1957,7 +1917,7 @@ patch_check)
 	exit
 	;;
 pingwhen)
-	grep 'GET / HTTP' $( mrm $ap_top/logs/access_log ) | tail -15
+	grep 'GET / HTTP' $( mrm $aptop/logs/access_log ) | tail -15
 	echo -n 'Current time: '
 	date
 	exit
