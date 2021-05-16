@@ -10,9 +10,11 @@ EGNAPA_HOST_CLASS ?= `(egg --home ~/sv/cur/apache2 cfq class || (read -t 60 -p "
 
 #EGNAPA_HOST_CLASS=`admegn class | sed 's/ .*//'`
 LBIN=$(HOME)/local/bin
+LLIB=$(HOME)/local/lib
 LOGS=$(HOME)/sv/cur/apache2/logs
 TMP=/tmp/n2t_create
 # removed recently: $(HOME)/init.d/apache 
+#
 UTILITIES=$(LBIN)/n2t $(LBIN)/wegn $(LBIN)/wegnpw $(LBIN)/admegn \
 	$(LBIN)/logwhich $(LBIN)/logwatch $(LBIN)/bdbkeys \
 		$(LBIN)/mrm $(LBIN)/aper \
@@ -20,6 +22,7 @@ UTILITIES=$(LBIN)/n2t $(LBIN)/wegn $(LBIN)/wegnpw $(LBIN)/admegn \
 		$(LBIN)/pfx $(LBIN)/mg $(LBIN)/showargs \
 		$(LBIN)/make_shdr $(LBIN)/shdr_exists $(LBIN)/make_ezacct \
 		$(LBIN)/doip2naan $(LBIN)/naan $(LBIN)/valsh \
+		$(LBIN)/validate_naans \
 	$(LBIN)/granvl $(LBIN)/replicate \
 	$(LBIN)/egg_batch $(LBIN)/aws-ec2-metadata
 FILES=boot_install_n2t db-5.3.28.tar.gz zlib-1.2.8.tar.gz \
@@ -37,11 +40,14 @@ basic: basicdirs basicfiles hostname svu utilities $(HOME)/init.d/apache crontab
 all: basic n2t_create.tar.gz
 
 # sub-targets of "basic"
-utilities: $(UTILITIES)
+utilities: $(UTILITIES) $(LLIB)/NAAN.pm 
 
 # this uses a "static pattern"
 $(UTILITIES): $(LBIN)/%: %
 	cp -p $< $(LBIN)
+
+$(LLIB)/NAAN.pm: NAAN.pm
+	cp -p $^ $@
 
 svu: $(LBIN)/svu_run $(HOME)/sv
 
@@ -135,42 +141,30 @@ crontab:
 	crontab $$ctab
 
 # Goal here is to reflect basic skeleton in the maintenance/role account.
+# Since these files are maintained in a separate "dotfiles" repo, sometimes
+# a reverse update (from the installed account dotfiles) is necessary.
+
+update_basicfiles:
+	@cd skel; rsync --info=NAME -a \
+		$(HOME)/.{bash_profile,bashrc,gitconfig,vimrc} .
 
 basicfiles:
-	@cd skel; \
-	for f in .bash_profile .bashrc .gitconfig .svudef .vimrc ; \
-	do \
-		if [[ $$f -nt $(HOME)/$$f ]]; then \
-			echo cp -p $$f $(HOME)/$$f; \
-			cp -p $$f $(HOME)/$$f; \
-		fi; \
-	done; true
+	@cd skel; rsync --info=NAME -a \
+		.bash_profile .bashrc .gitconfig .svudef .vimrc $(HOME)
 
-#basicfiles: skel/.bash_profile
+#basicfiles:
 #	@cd skel; \
-#	asked=; \
-#	for f in `find . | sed -e 's,^\./,,' -e '/^ssl\//d'`; \
+#	for f in .bash_profile .bashrc .gitconfig .svudef .vimrc ; \
 #	do \
-#		if [[ ! -f $$f ]]; then \
-#			true; \
-#		elif [[ ! -f $(HOME)/$$f ]]; then \
+#		if [[ $$f -nt $(HOME)/$$f ]]; then \
+#			echo cp -p $$f $(HOME)/$$f; \
 #			cp -p $$f $(HOME)/$$f; \
-#		elif [[ $$f =~ .hgrc|.bashrc|.bash_profile ]]; then \
-#			cmp -s $$f $(HOME)/$$f || echo "Warning: skel/$$f" \
-#				"different from $(HOME)/$$f"; \
-#		elif [[ $$f -nt $(HOME)/$$f ]]; then \
-#			[[ $$asked ]] || echo -e \
-#    "Take care overwriting files (eg, .bashrc) from skel/ with content\nto" \
-#    "preserve.  Content from skel may be better moved manually."; \
-#			cp -ip $$f $(HOME)/$$f; \
-#			asked=1; \
 #		fi; \
 #	done; true
-#	@chmod 600 $(HOME)/.hgrc
 
-BASICDIRS=$(LBIN) $(HOME)/warts $(HOME)/warts/ssl $(HOME)/ssl \
+BASICDIRS=$(LBIN) $(LLIB) $(HOME)/warts $(HOME)/warts/ssl $(HOME)/ssl \
 	$(HOME)/.ssh $(HOME)/logs $(HOME)/init.d $(HOME)/backups \
-	$(HOME)/minters $(HOME)/binders $(HOME)/naans $(HOME)/batches
+	$(HOME)/minters $(HOME)/binders $(HOME)/naans $(HOME)/batches \
 
 basicdirs: $(BASICDIRS)
 
@@ -185,7 +179,7 @@ basicdirs: $(BASICDIRS)
 $(HOME)/backups $(HOME)/naans:
 	mkdir -p $@
 
-$(LBIN) $(HOME)/warts $(HOME)/warts/ssl $(HOME)/init.d $(HOME)/batches:
+$(LBIN) $(LLIB) $(HOME)/warts $(HOME)/warts/ssl $(HOME)/init.d $(HOME)/batches:
 	mkdir -p $@
 
 # XXX better: point env.sh directly to ~/ssl/*/.cer, because it's easier

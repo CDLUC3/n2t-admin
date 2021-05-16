@@ -1,22 +1,28 @@
 [user]
-	name = John A. Kunze
+	name = John Kunze
 	email = 105020+jkunze@users.noreply.github.com
 [core]
-	editor = vi
+	editor = vim
 	pager = less
 [color]
 	ui = true
+[color "diff"]
+	new = bold yellow
 [push]
 	default = simple
 [alias]
 	alias = ! git config --get-regexp ^alias\\. | sed -e s/^alias\\.// -e s/\\ /\\ =\\ /
-	br    = branch
-	chi   = commit -a -v
+	list  = branch -a
+	chi   = commit -a -v -m
 	cho   = checkout
 	df    = diff HEAD
 	lg    = log --decorate
 	lp    = log --decorate --patch
+	lf    = log --name-status
+        ll    = log --pretty=format:"%h %ad %an%x09%s" --date=short
 	mg    = merge
 	pl    = pull
 	ps    = push
 	st    = status -sb
+        incoming = ! git fetch && git lg ..origin/main
+        outgoing = ! git fetch && git lg origin/main..

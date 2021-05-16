@@ -1,5 +1,9 @@
-# This file of bash settings is source'd on shell start up to create
-# an environment suitable for N2T.net administration.
+# This file should be source'd by .bash_profile.
+
+# NOTE: more functions (eg, zm()) brought in via source ~/.profile.d/$whoami
+
+# This file of bash settings is source'd by .bash_profile on shell start up to
+# create an environment suitable for N2T administration, among other things.
 
 PATH=$HOME/local/bin:$PATH
 
@@ -14,7 +18,7 @@ fi
 export PERL_INSTALL_BASE=~/local	# note: this can change via svu
 export PERL5LIB=~/local/lib/perl5	# note: this can change via svu
 export LC_ALL=C		# set computer mode locale, so all chars/scripts work
-export TMPDIR=~/backups		# make Berkeley DB TMPDIR not be tiny /tmp
+export TMPDIR=$HOME/sv		# make Berkeley DB TMPDIR not be tiny /tmp
 
 export LESS='ieFRX'	# ignore case, quit on 2nd EOF, honor color escapes,...
 export LESSCHARSET=utf-8
@@ -83,32 +87,24 @@ alias mkperl='perl Makefile.PL INSTALL_BASE=$PERL_INSTALL_BASE'
 
 # XXX should source these from $se/s/n2t/service.cfg
 
-n2prda='n2t@ids-n2t-prd-2a.n2t.net'
-	alias n2prda="ssh $n2prda"
-n2prdb='n2t@ids-n2t-prd-2b.n2t.net'
-	alias n2prdb="ssh $n2prdb"
-ezprd='ezid@ezid.cdlib.org'
-	alias ezprd="ssh $ezprd"
-n2stga='n2t@ids-n2t-stg-2a.n2t.net'
-	alias n2stga="ssh $n2stga"
-n2stgb='n2t@ids-n2t-stg-2b.n2t.net'
-	alias n2stgb="ssh $n2stgb"
-n2stgc='n2t@ids-n2t-stg-2c.n2t.net'
-	alias n2stgc="ssh $n2stgc"
-n2dev='n2t@ids-n2t-dev.n2t.net'
+n2dev='n2t@ids-n2t2-dev.n2t.net'
 	alias n2dev="ssh $n2dev"
-n2dev2='n2t@ids-n2t2-dev.n2t.net'
-	alias n2dev2="ssh $n2dev2"
-n2stg2='n2t@ids-n2t2-stg.n2t.net'
-	alias n2stg2="ssh $n2stg2"
-n2prd2='n2t@ids-n2t2-prd.n2t.net'
-	alias n2prd2="ssh $n2prd2"
-n2devb='n2t@ids-n2t2-dev-2b.n2t.net'
-	alias n2devb="ssh $n2devb"
+n2stg='n2t@ids-n2t2-stg.n2t.net'
+	alias n2stg="ssh $n2stg"
+n2prd='n2t@ids-n2t2-prd.n2t.net'
+	alias n2prd="ssh $n2prd"
+n2dkdev='n2t@ids-n2tdocker-dev.n2t.net'
+	alias n2dkdev="ssh $n2dkdev"
+n2dkstg='n2t@ids-n2tdocker-stg.n2t.net'
+	alias n2dkstg="ssh $n2dkstg"
+n2dkprd='n2t@ids-n2tdocker-prd.n2t.net'
+	alias n2dkprd="ssh $n2dkprd"
 n2edina='n2t@n2tlx.edina.ac.uk'
 	alias n2edina="ssh $n2edina"
 yzdev='yamz@ids-yamz2-dev.yamz.net'
 	alias yzdev="ssh $yzdev"
+ezprd='ezid@ezid.cdlib.org'
+	alias ezprd="ssh $ezprd"
 
 alias ezmonit='~/ezidclient p admin:$(wegnpw ezidadmin) pause monitor'
 alias zp='ezcl p admin:$(wegnpw ezidadmin) pause'
@@ -122,7 +118,12 @@ if [ ! -z "${PS1:-}" ]; then		# if interactive shell
 	reset=$(tput sgr0)
         #PS1='\[$blue\]\h:\W \u\$ \[$reset\]'
 	# Make bash check its window size after a process completes
-	shopt -s direxpand	# make tab completion stop escaping $var
+	# Enable some Bash 4 features when possible:
+	# * Recursive globbing, e.g. `echo **/*.txt`
+	for option in direxpand globstar; do
+		shopt -s "$option" 2> /dev/null;
+	done;
+	#shopt -s direxpand	# make tab completion stop escaping $var
 	shopt -s checkwinsize
 	#set -o vi		# for vi-style command line editing
 
@@ -143,12 +144,12 @@ if [ ! -z "${PS1:-}" ]; then		# if interactive shell
 	dvcs_dirty_pad='  '	# same width as dirty mark, for width bug
 	dvcs_branch=
 	function parse_dvcs_branch {
-		dvcs_branch=$( hg branch 2> /dev/null ) && {
-			echo "$dvcs_branch"
-			#echo "<\[$yellow\]$dvcs_branch\[$reset\]>"
-			#echo "<$dvcs_branch>"
-			return
-		}
+		#dvcs_branch=$( hg branch 2> /dev/null ) && {
+		#	echo "$dvcs_branch"
+		#	#echo "<\[$yellow\]$dvcs_branch\[$reset\]>"
+		#	#echo "<$dvcs_branch>"
+		#	return
+		#}
 		dvcs_branch=$( git branch --no-color 2> /dev/null ) ||
 			return		# no git repo
 		dvcs_branch=$( sed -ne 's/^\* //p' <<< "$dvcs_branch" ) && {
@@ -160,10 +161,10 @@ if [ ! -z "${PS1:-}" ]; then		# if interactive shell
 		# yyy wish I could save $dvcs_branch in calling shell
 	}
 	function parse_dvcs_dirty {
-		[[ $( hg --quiet status 2> /dev/null ) != "" ]] && {
-			echo "$dvcs_dirty_mark"
-			return
-		}
+		#[[ $( hg --quiet status 2> /dev/null ) != "" ]] && {
+		#	echo "$dvcs_dirty_mark"
+		#	return
+		#}
 		local gitish=
 		#dvcs_dirty=$( git status 2> /dev/null ) &&
 		dvcs_dirty=$( git status --porcelain 2> /dev/null ) &&
@@ -189,16 +190,17 @@ fi
 # xxx should the aliases below become functions?
 alias c=clear	# health: clear often so eyes/neck not always at screen bottom
 alias h="history | tail -100"
-alias edate="date '+%Y%m%d%H%M%S'"              # ERC-style date
+alias edate="date '+%Y%m%d%H%M%S'"              # even TEMPER date
+alias tdate="date '+%Y.%m.%d_%H:%M:%S'"         # TEMPER ERC-style date
 alias isodate="date '+%Y-%m-%dT%H:%M:%S%z'"	# ISO8601-style date
 
 # "command" prevents recursion
 function ls { command ls -F "$@"; }
+function la { command ls -AF "$@"; }
 function cp { command cp -p "$@"; }
 function scp { command scp -p "$@"; }
 function df { command df -k "$@"; }
 
-function j() { jobs -l "$@"; }
 function j() { jobs -l "$@"; }
 function m() { less "$@"; }
 function q() { exit "$@"; }
@@ -206,12 +208,14 @@ function z() { suspend "$@"; }
 function pd() { pushd "$@"; }
 function pp() { popd "$@"; }
 function ll() { ls -lF "$@"; }
+function view() { command vim -R "$@"; }
 
 # usage:  mm any_command
 #function mm()  { $* $2 $3 $4 $5 $6 $7 $8 $9 | 2>&1 more ; }
 function mm()   { "$@" | 2>&1 less ; }
-# usage:  g pattern any_command
-function g() { $2 $3 $4 $5 $6 $7 $8 $9 | grep -i "$1" ; }
+function g()	{ git "$@" ; }
+# usage:  gr pattern any_command
+function gr() { $2 $3 $4 $5 $6 $7 $8 $9 | grep -i "$1" ; }
 function hd()   { "$@" | head -5 ; }
 function hd1()  { "$@" | head -1 ; }
 function hd2()  { "$@" | head -10 ; }
@@ -220,6 +224,17 @@ function llt1() { hd1 ls -lt ; }
 function llt2() { hd2 ls -lt ; }
 function val { v=$(bc <<< "scale=5; "$@""); echo v=$v ; }
 function v { v=`sed "s/  */+/g" <<< "scale=5;"$@"" | bc`; echo v=$v; }
+
+function upsync {
+	[[ "$1" ]] || {
+		cat << EOT 1>&2
+Usage: upsync File ... Destdir
+Update all Files different from their counterparts in Destdir (eg, ~/local/bin).
+EOT
+		return 1
+	}
+	rsync --info=NAME -a "$@"
+}
 
 function dumpcert() {
 	[[ "$1" ]] || {
@@ -230,6 +245,64 @@ EOT
 		return 1
 	}
 	openssl x509 -in "$1" -text -noout
+}
+
+function error_log () {
+
+	local File=$( mrm $sa/logs/error_log )
+	local pattern=" AH[^:]*: "
+	[[ ! "${1:-}" ]] && {
+		cat << EOT 1>&2
+
+Usage: error_log [ -N | -f ] [ File ]
+
+This function prints just the bare Apache error_log messages (/$pattern/),
+minus the copious rewrite messages. By default it prints all lines from the
+most recently modified log*, or from the given File. To print just the last
+N lines, use -N, or to print lines as they arrive in the log, use -f.
+
+* Current log: $File
+
+EOT
+		return 1
+	}
+	local follow=
+	local N=
+	local arg
+	for arg in "$@"
+	do
+		[[ "${1:-}" == -f ]] && {
+			follow=1
+			shift
+			continue
+		}
+		[[ "${1:-}" =~ ^- ]] && {
+			N=${1#-}
+			grep '^[0-9][0-9]*$' <<< "$N" >& /dev/null || {
+				echo "error: integer expected for -N arg," \
+					"not $N" 1>&2
+				return 1
+			}
+			shift
+			continue
+		}
+	done
+	[[ "${1:-}" ]] && {
+		File="${1:-}"
+		shift
+	}
+	local tailargs=()
+	if [[ "$follow" ]]
+	then
+		tailargs=(-f)
+	elif [[ "$N" ]]
+	then
+		tailargs=(-n $N)
+	else
+		tailargs=(-n +1)		# whole file
+	fi
+	echo "grep \"$pattern\" $File | tail ${tailargs[@]}"
+	grep "$pattern" $File | tail ${tailargs[@]}
 }
 
 function eztest () {
@@ -318,69 +391,6 @@ EOT
 # For .vimrc, to change "::" into "make_shdr --remove"
 # :map KM yyP2smake_shdr --remove^[
 
-function yaml {
-	[[ "$1" ]] || {
-		cat << EOT 1>&2
-Usage: yaml [--bash] FILE ...
-This function checks the YAML syntax of each FILE argument. The --bash option
-causes it to output equivalent bash-style environment variable settings.
-EOT
-		return 1
-	}
-	local envout=		# "false"
-	[[ "$1" == "--bash" ]] && {
-		shift
-		# this means we'll output bash-style env vars
-		# xxx to do: create a warts section inside egg_config
-		envout='
-			my $warts = $cfh->{warts};
-			while (my ($k, $v) = each %$warts) {
-				say "$k=$v";
-			}'
-	}
-	local status=0
-	for f in $@
-	do
-		# verify YAML; use non-Tiny YAML for better error messages
-		perl -CS -E '
-			use YAML "LoadFile";
-			my $cfh = LoadFile("'"$f"'");
-			'"$envout"			|| {
-			echo "syntax not ok - $f"
-			status=1
-			continue
-		}
-		[[ "$envout" ]] ||
-			echo syntax ok - $f
-	done
-	return $status
-}
-
-function in_ezid {
-	local id n=5
-	[[ "$1" ]] || {
-		cat << EOT 1>&2
-Usage: in_ezid ID_START ...
-
-Print any ids (up to $n) in the EZID binder that start with ID_START. Examples:
-
-	in_ezid ark:/13030
-	in_ezid doi:10.5070/P2
-
-EOT
-		return 1
-	}
-	local lines
-	(( lines=( $n + 2 ) ))		# bump up since not all lines have ids
-	for id in "$@"
-	do
-		echo "=== $id ==="
-		egg -d ~/binders/ezid list 0 "$id" | tail -$lines
-	done
-}
-# .vimrc
-# :map KM yyP2smake_shdr --remove^[
-
 function modversion () {
 	[[ "$1" ]] || {
 		echo "Usage: modversion ModuleName ..."
@@ -456,6 +466,8 @@ svu cur			# this is what we want by default
 
 # XXX maybe these should be set by svurun?
 sa=$sv/apache2
+sh=$sa/htdocs
+she=$sh/e
 se=$sv/build/eggnog
 sn=~/n2t_create
 
