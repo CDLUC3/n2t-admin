@@ -6,7 +6,7 @@
 	source ~/.bashrc	# which might not exist yet
 
 set -u			# now make the use of unset variables throw an error
-hgrc=~/.hgrc
+gtcf=~/.gitconfig
 envsh=warts/env.sh
 fakeuser=samsmith
 
@@ -20,7 +20,6 @@ then
 	cat << EOT
 Usage: $0 [ init | config | httpd [ new ] | build | install | realclean ]
 
-    XXX need to update this for git after hg->git migration
 Use these instructions and script to set up N2T on a new AWS EC2 instance.
 Pick the name of the user role account that will administer the service.
 Let's call it "n2t". Start by assuming the identity of the user,
@@ -36,7 +35,7 @@ answer the questions asked by running
 and follow the instructions below, as well as any printed by this script.
 
   1.  Verify that you have correct values for username and cdl.username
-      inside your ~/.hgrc file (~/.gitconfig file).
+      inside your ~/.gitconfig file.
 
   2.  Add your instance's ssh key to bitbucket.org (github.com).
 
@@ -151,23 +150,20 @@ function ec2_init {
 		echo OK to answer the next few questions with defaults.
 		ssh-keygen -t rsa         # enter no filename, no passphrase
 	}
-	echo This is your public key for copy/paste into hg repo.
+	echo This is your public key for copy/paste into github.
 	cat ~/.ssh/id_rsa.pub
 
-	[[ -e $hgrc ]] || {
-		echo creating generic $hgrc '<---' edit this change user names
-		cat > $hgrc << EOT
+	[[ -e $gtcf ]] || {
+		echo creating generic $gtcf '<---' edit this change user names
+		cat > $gtcf << EOT
 
 [ui]
-# EDIT NEXT LINE
-username = Sam Smith <samsmith@example.org>
-merge=internal:merge
-ssh = ssh -C
-
-[auth]
-cdl.prefix   = ssh://hg@bitbucket.org/cdl
-# EDIT NEXT LINE
-cdl.username = $fakeuser
+# EDIT name AND email LINES
+[user]
+	name = Sam Smith
+	email = 105020+$fakeuser@users.noreply.github.com
+[push]
+	default = simple
 
 EOT
 	}
@@ -307,7 +303,7 @@ EOT
 
 	sudo yum -y group erase "Development Tools"
 	sudo yum -y group erase "Web Server"
-	sudo yum -y erase mod_ssl libdb hg git
+	sudo yum -y erase mod_ssl libdb git
 	sudo yum -y erase 'perl(DB_File)'
 	sudo yum -y erase 'perl(BerkeleyDB)'
 	sudo yum -y erase 'perl(Data::UUID)' 'perl(Test::More)'
@@ -325,7 +321,7 @@ EOT
 	sudo yum -y erase glances
 	#sudo amazon-linux-extras erase -y vim
 	#sudo amazon-linux-extras erase -y postgresql11
-	# XXX not removing .hgrc or .gitconfig
+	# XXX not removing .gitconfig
 	echo
 	echo Now logout and login again. If lots of system updates occurred, you should reboot first.
 	echo
@@ -335,10 +331,10 @@ EOT
 source ~/warts/env.sh
 
 # If we get get here, $cmd was "go", so full steam ahead.
-# yyy ask for more info to get $hgrc correct with init
+# yyy ask for more info to get $gtcf correct with init
 
-grep "^cdl.username.*$fakeuser" $hgrc && {
-	echo "Error: you first need to edit values in $hgrc"
+grep "email.*$fakeuser" $gtcf && {
+	echo "Error: you first need to edit values in $gtcf"
 	exit 1
 }
 
@@ -365,7 +361,7 @@ grep "^cdl.username.*$fakeuser" $hgrc && {
 
 	sudo yum -y install mod_ssl
 	sudo yum -y install libdb		# linux2 v5 is default
-	sudo yum -y install hg git
+	sudo yum -y install git
 	sudo yum -y install 'perl(DB_File)'	# used by, eg, admegn mload
 	sudo yum -y install 'perl(BerkeleyDB)'
 	sudo yum -y install 'perl(Data::UUID)' 'perl(Test::More)'
@@ -424,15 +420,10 @@ grep "^cdl.username.*$fakeuser" $hgrc && {
 	# # PYTHONPATH=$sv/lib64/python2.6/dist-packages
 
 	cd		# go to home directory
-	hg clone ssh://hg@bitbucket.org/cdl/n2t-admin
+	git clone git@github.com:jkunze/n2t-admin.git
 	rm -fr n2t_create	# if it exists the rename below won't work
 	mv n2t-admin n2t_create		# simple rename
 	cd n2t_create
-	linux2=$( hg branches | grep linux2 )
-	[[ "$linux2" ]] && {
-		hg update linux2
-		echo note: repo should be set to Linux2 branch
-	}
 	make			# sets up .bashrc and svu defs; runs "svu init"
 	# sets up of crontab, which we need to disable for now
 	crontab /dev/null
@@ -459,7 +450,6 @@ grep "^cdl.username.*$fakeuser" $hgrc && {
 	#./make_instance build mongodb_pm n2t > berrs 2>&1 || {
 
 # XXX make user do svu new?
-	# XXX this script and make_instance call "hg" -- remember to convert
 	svu new || {
 		echo Bailing
 		exit 1
@@ -467,7 +457,6 @@ grep "^cdl.username.*$fakeuser" $hgrc && {
 	echo -n "SVU status, pre-make_instance: " ; svu status
 
 # XXX script takes over here
-	# XXX this script and make_instance call "hg" -- remember to convert
 	echo Creating bare-bones apache server.
 	do_apache_httpd24 new 	# copy and modify system version just
 				# enough to let us start a server
@@ -545,7 +534,6 @@ EOT
 	#./make_instance build mongodb_pm n2t > berrs 2>&1 || {
 
 # XXX make user do svu new?
-	# XXX this script and make_instance call "hg" -- remember to convert
 	svu new || {
 		echo Bailing
 		exit 1
@@ -553,7 +541,6 @@ EOT
 	echo -n "SVU status, pre-make_instance: " ; svu status
 
 # XXX script takes over here
-	# XXX this script and make_instance call "hg" -- remember to convert
 	echo Creating bare-bones apache server.
 	do_apache_httpd24 new 	# copy and modify system version just
 				# enough to let us start a server
