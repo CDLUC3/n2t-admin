@@ -37,12 +37,7 @@ and follow the instructions below, as well as any printed by this script.
   1.  Verify that you have correct values for username and cdl.username
       inside your ~/.gitconfig file.
 
-  2.  Add your instance's ssh key to bitbucket.org (github.com).
-
-      Login to https://bitbucket.org/cdl, click on your avatar, then on
-      "bitbucket settings" -> "add ssh key" (or something like that).
-      View your key with "cat ~/.ssh/id_rsa.pub" and paste it in when
-      bitbucket asks for it and add it to other n2t hosts as needed.
+  2.  Add your instance's ssh key to github.com.
 
   3.  Copy into ~/warts/.pswdfile.n2t the same from from another host, eg,
 
