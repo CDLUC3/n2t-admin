@@ -6,11 +6,10 @@
 	source ~/.bashrc	# which might not exist yet
 
 set -u			# now make the use of unset variables throw an error
-gtcf=~/.gitconfig
+home=/apps/n2t			# XXX bad idea to change this
+gtcf=$home/.gitconfig
 envsh=warts/env.sh
 fakeuser=samsmith
-
-linux2=true		# xxx remove this later
 
 cmd=${1:-}
 shift
@@ -21,25 +20,26 @@ then
 Usage: $0 [ init | config | httpd [ new ] | build | install | realclean ]
 
 Use these instructions and script to set up N2T on a new AWS EC2 instance.
-Pick the name of the user role account that will administer the service.
-Let's call it "n2t". Start by assuming the identity of the user,
+Pick any name of the user role account that will administer the service,
+AS LONG AS IT'S n2t and the home directory is /apps/n2t (yes, limiting).
+Start by assuming the identity of the user,
 
    \$ sudo su - n2t
 
-and making sure you're in n2t's home directory. To set up gather information
-to allow yum installation, shell startup files, and other foundation files,
-answer the questions asked by running
+and making sure you're in n2t's home directory. The next step sets up what's
+needed to do yum installs and to create shell startup and other foundation
+files. Answer the questions asked by running
 
       $0 init
 
 and follow the instructions below, as well as any printed by this script.
 
-  1.  Verify that you have correct values for username and cdl.username
-      inside your ~/.gitconfig file.
+  1.  Verify that you have correct values for name and email inside
+      your ~/.gitconfig file.
 
   2.  Add your instance's ssh key to github.com.
 
-  3.  Copy into ~/warts/.pswdfile.n2t the same from from another host, eg,
+  3.  Copy ~/warts/.pswdfile.n2t from another host, eg,
 
         scp -p n2t-dev.n2t.net:warts/.pswdfile.n2t ~/warts/
 
@@ -181,7 +181,7 @@ export EGNAPA_HOST_CLASS=$class		# eg, one of dev, stg, prd, loc
 # Define fullpaths to the certificate files. Use EGNAPA_SSL_CERTFILE for
 # the main certificate and EGNAPA_SSL_KEYFILE for the pirviate key.
 
-ssldir=/apps/n2t/warts/ssl/n2t.net
+ssldir=$home/warts/ssl/n2t.net
 # see \$ssldir/README for file choices
 export EGNAPA_SSL_CERTFILE=\$ssldir/fullchain.pem
 export EGNAPA_SSL_KEYFILE=\$ssldir/privkey.pem
@@ -311,9 +311,9 @@ EOT
 	sudo yum -y erase 'perl(CGI)'
 	sudo yum -y erase python3		# for transition
 	sudo yum -y erase jq			# for Internet Archive API
-	sudo yum -y erase golang		# nice, but not essential
-	sudo yum -y erase htop
-	sudo yum -y erase glances
+	#sudo yum -y erase golang		# nice, but not essential
+	#sudo yum -y erase htop
+	#sudo yum -y erase glances
 	#sudo amazon-linux-extras erase -y vim
 	#sudo amazon-linux-extras erase -y postgresql11
 	# XXX not removing .gitconfig
@@ -377,42 +377,11 @@ grep "email.*$fakeuser" $gtcf && {
 	sudo yum -y install 'perl(App::cpanminus)'
 	sudo yum -y install python3		# for transition
 	sudo yum -y install jq			# for Internet Archive API
-	sudo yum -y install golang		# nice, but not essential
-	sudo yum -y install htop		# monitoring tool
-	sudo yum -y install glances		# monitoring tool
+	#sudo yum -y install golang		# nice, but not essential
+	#sudo yum -y install htop		# monitoring tool
+	#sudo yum -y install glances		# monitoring tool
 	sudo amazon-linux-extras install -y vim	# nice, but not essential
-	sudo amazon-linux-extras install -y postgresql11
-
-	#sudo yum-config-manager --add-repo \
-	#	https://repo.mongodb.org/yum/amazon/2/mongodb-org/4.0/x86_64/
-	## see https://confluence.ucop.edu/display/CUG/Amazon+Linux+2+User+Guide#AmazonLinux2UserGuide-Packages
-	#sudo yum -y install mongodb-org
-	#echo \
-#"WARNING: on AWS Linux2, this installation of mongodb configures host boot
-#scripts via systemd to automatically start mongo on port 27017" 1>&2
-	# on mac, need: brew install mongodb --with-openssl
-	# yyy never actually used telnet for this
-	#sudo yum -y install telnet	# network testing, eg, mongo replication
-	#rpm -V mongodb-org || {		# because it has gpgcheck disabled
-	#	sudo yum -y remove mongodb-org
-	#	echo error: mongodb-org installation failed to verify -- aborting.
-	#	exit 1
-	#}
-	# yyy (c) opened up access between mongo replicas on
-	# ports 27017-27027 and 47017-47027.
-
-	## Turn off mongod that $systemd is configured to start up by default.
-	#sudo systemctl disable mongod
-
-	# Try the hypothesis that we don't need these next two yum installs
-	# # XXX should confirm that these next are still needed
-	# # This next installs python's lxml module so that the mdsadmin script
-	# # (that creates DataCite datacenters) can run.
-	# sudo yum -y install libxml2-devel libxslt-devel python-devel
-	# sudo yum -y install libxml2-python libxslt-python python-pip
-	# pip install --install-option="--prefix=$sv" lxml
-	# # To use this module, .bashrc sets PYTHONPATH to something like
-	# # PYTHONPATH=$sv/lib64/python2.6/dist-packages
+	#sudo amazon-linux-extras install -y postgresql11
 
 	cd		# go to home directory
 	git clone git@github.com:jkunze/n2t-admin.git
