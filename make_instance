@@ -760,7 +760,8 @@ do
 	echo ======================== package $p ========================
 	rm -fr $p
 	#hg clone ssh://hg@bitbucket.org/cdl/$p
-	git clone git@github.com:jkunze/$p.git
+	#git clone git@github.com:jkunze/$p.git
+	git clone https://github.com/jkunze/$p.git
 
 	[[ "$p" == "n2t-eggnog" ]] && {
 		# create kludge link so build_server_tree with pfx import works
