@@ -20,7 +20,7 @@ then
 	cat << EOT
 Usage: $0 [ init | config | httpd [ new ] | build | install | realclean ]
 
-# XXX what to do with passwords? add IA password only?
+# XXX make certs use LetsEncrypt
 
 Use these instructions and script to set up N2T on a new AWS EC2 instance.
 Pick any name of the user role account that will administer the service,
@@ -43,20 +43,19 @@ and follow the instructions below, as well as any printed by this script.
   2.  If you're planning to update the code on github, add your instance's
       ssh key to github.com.
 
-  3.  XXX Copy ~/warts/.pswdfile.n2t from another host, eg,
+  3.  Copy ~/warts/.pswdfile.n2t.oca from another host, eg,
 
-        scp -p n2t-dev.n2t.net:warts/.pswdfile.n2t ~/warts/
+        scp -p n2t-dev.n2t.net:warts/.pswdfile.n2t.oca ~/warts/.pswdfile.n2t
 
-  4.  Make sure that your system people have put your web server certs
-      file into a ~/ssl/YYYY-MM-DD directory, and match the cert filename
-      assignments in ~/$envsh to the correct files.
+  4.  Make sure that your system has web server certs in ~/warts/ssl/n2t.net
+      that match the cert filename assignments in ~/$envsh.
 
 This next step takes several minutes: run (interactively, don't background)
 
       $0 config
 
-If your system doesn't need to reboot, it's a good idea to logout and login
-again to make sure the startup files are working. Then do
+It's a good idea to logout and login again to make sure the startup files
+are working. Then do
 
       $0 build
 
@@ -430,6 +429,7 @@ grep "email.*$fakeuser" $gtcf && {
 	do_apache_httpd24 new 	# copy and modify system version just
 				# enough to let us start a server
 
+	echo Chdir to ~/n2t_create.
 	cd ~/n2t_create || {    # go back to build directory
 		echo Bailing
 		exit 1
