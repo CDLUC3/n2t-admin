@@ -35,8 +35,9 @@ function usage {
 		cat << EOT
 For more information, do "$me help". Basic subcommands:
 
-subpublish    copy given component to publicly harvestable part of this server
-       yyy    but don't conflict with 'pub/' managed on prd by 'naans' repo
+publish       copy ebi.anvl to publicly visible part of this server (for tlog)
+#subpublish    copy given component to publicly harvestable part of this server
+#       yyy    but don't conflict with 'pub/' managed on prd by 'naans' repo
 harvest       assemble components from external sources (eg, daily via cron)
 import        assemble harvested prefix components into \$pfx_import
 test          test prefix lookup and redirect rules (only tests BUILD area)
@@ -379,7 +380,9 @@ pfx_sources=(					# yyy normalized names
 source_base_prefixes=build/eggnog/t/n2t/$pfx_base
 master_base_prefixes=$sv/$source_base_prefixes
 
-subpublished=$sv/apache2/htdocs/e/subpub
+published=$sv/apache2/htdocs/e/pub
+
+subpublished=$sv/apache2/htdocs/e/subpub	# XXX drop?
 
 # first check for errors in harvested sources; if none move out of
 # quarantine; if there's an error in a quarantined file, it stays
@@ -2711,6 +2714,12 @@ validate)
 	#}
 	#echo "$me process running now in $pfx_build directory"
 	pfx_prebuild "$@" && pfx_validate "$@"		# yyy args unused
+	exit
+	;;
+publish)
+	pfx_prebuild "$@" && pfx_validate "$@" && \
+		cp -p $pfx_build/ebi.anvl $published/
+	# yyy args unused
 	exit
 	;;
 combine)
