@@ -118,5 +118,5 @@ shoulder_registry.txt: $(PUB)/shoulder_registry.txt
 
 $(PFX_SOURCES):
 	mkdir -p $(PUB)
-	(cd $(PUB); curl --silent -O 'https://n2t.net/e/pub/{ebi.anvl,naan_registry.txt,naan_table.txt,shouder_registry.txt}')
+	(cd $(PUB); curl --silent -O 'https://n2t.net/e/pub/{ebi.anvl,naan_registry.txt,naan_table.txt,shoulder_registry.txt}')
 
