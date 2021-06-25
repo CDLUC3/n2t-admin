@@ -418,14 +418,14 @@ grep "email.*$fakeuser" $gtcf && {
 	# NB: ./make_instance requires "svu new", where installs go
 	#./make_instance build mongodb_pm n2t > berrs 2>&1 || {
 
-# XXX make user do svu new?
+	# xxx make user do svu new?
 	svu new || {
 		echo Bailing
 		exit 1
 	}
-	echo -n "SVU status, pre-make_instance: " ; svu status
+	echo -n "SVU status, pre-'do_apache_httpd24 new': " ; svu status
 
-# XXX script takes over here
+	# xxx script takes over here
 	echo Creating bare-bones apache server.
 	do_apache_httpd24 new 	# copy and modify system version just
 				# enough to let us start a server
@@ -436,9 +436,12 @@ grep "email.*$fakeuser" $gtcf && {
 		exit 1
 	}
 
+	echo -n "SVU status, pre-make_instance: " ; svu status
+	echo Current directory: $(pwd --physical)
+
 	echo 'Running ./make_instance build ..., output in "make_instance_errs"'
 	#./make_instance build mongodb_pm n2t > make_instance_errs 2>&1 || {
-# XXX do some prefix harvesting before this!
+# xxx do some prefix harvesting before this!
 	./make_instance build n2t > make_instance_errs 2>&1 || {
 		echo make_instance error -- bailing
 		svu cur
@@ -447,7 +450,7 @@ grep "email.*$fakeuser" $gtcf && {
 	echo 'Finished ./make_instance build ..."'
 	echo -n "SVU status, pre-svu-rollout: " ; svu status
 
-# XXX make user do svu rollout?
+	# yyy make user do svu rollout?
 	# now make installed stuff "current" (what was "new" will be "cur")
 	svu rollout	# ok as no users yet; this puts everything of interest
 			# under the 'cur' version, our default logged-in state
@@ -489,7 +492,7 @@ Please copy ~/n2t_create/apache.n2t to /etc/init.d/apache.n2t and set up chkconf
 When ready, adjust eggnog_conf values to turn on crontab for things like
 prefix harvesting, error checks, backups, etc.
 
-When all is stable, arrange for Nagios web service monitoring.
+When all is stable, arrange for web service monitoring (eg, Nagios).
 
 To switch between two main utility directories, use "cd $sn; pd $se".
 
@@ -497,87 +500,3 @@ EOT
 	exit
 }
 
-[[ "$cmd" == oldbuild ]] && {
-
-	# XXXX resume script here
-	#./make_instance build mongodb_pm httpd n2t > berrs 2>&1
-	# NB: ./make_instance requires "svu new", where installs go
-	#./make_instance build mongodb_pm n2t > berrs 2>&1 || {
-
-# XXX make user do svu new?
-	svu new || {
-		echo Bailing
-		exit 1
-	}
-	echo -n "SVU status, pre-make_instance: " ; svu status
-
-# XXX script takes over here
-	echo Creating bare-bones apache server.
-	do_apache_httpd24 new 	# copy and modify system version just
-				# enough to let us start a server
-
-	cd ~/n2t_create || {    # go back to build directory
-		echo Bailing
-		exit 1
-	}
-	echo 'Running ./make_instance build ..., output in "make_instance_errs"'
-	#./make_instance build mongodb_pm n2t > make_instance_errs 2>&1 || {
-# XXX do some prefix harvesting before this!
-	./make_instance build n2t > make_instance_errs 2>&1 || {
-		echo make_instance error -- bailing
-		svu cur
-		exit 1
-	}
-	echo 'Finished ./make_instance build ..."'
-	echo -n "SVU status, pre-svu-rollout: " ; svu status
-
-# XXX make user do svu rollout?
-	# now make installed stuff "current" (what was "new" will be "cur")
-	# ok as no users yet; this puts everything of interest
-	# under the 'cur' version, our default logged-in state
-	svu rollout || {
-		echo Bailing: svu rollout failed
-		exit 1
-	}
-	echo done svu rollout
-
-	svu cur	|| {	# make sure we're on current version before n2t rollout
-		echo Bailing: svu cur failed
-		exit 1
-	}
-	echo -n "SVU status, pre-n2t-rollout: " ; svu status
-
-	n2t rollout || {		# takes care of dvcsid test
-		echo Bailing: n2t rollout failed
-		exit 1
-	}
-
-	# yyy chicken & egg problem(?) with rollout, which depends on prefixes.
-	#     seems we might need to run "pfx hitrnt" before rollout?, but we
-	#     can't do that before we've rolled things out the first time
-	#     (or can we?)
-# XXX harvest files have come in before the 'make all' implied above
-# XXX and the below won't work until rollout,? because... why?
-#     since $sa/prefixes isn't in place?
-	#pfx hitrnt	# 2nd time might work? XXX
-	#n2t rollout
-
-	n2t test		# test that things are more or less ok
-
-	#echo 'Now grab and install warts/.pswdfile.n2t from another system.'
-
-	#### IMPORTANT!
-	cat << EOT
-Ask your superuser:
-Please copy ~/n2t_create/apache.n2t to /etc/init.d/apache.n2t and set up chkconfig so that the N2T service comes up on machine (re)boot.
-
-When ready, adjust eggnog_conf values to turn on crontab for things like
-prefix harvesting, error checks, backups, etc.
-
-When all is stable, arrange for Nagios web service monitoring.
-
-To switch between two main utility directories, use "cd $sn; pd $se".
-
-EOT
-	exit
-}
