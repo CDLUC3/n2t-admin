@@ -1,0 +1,117 @@
+# ======== 1900.01.01_00:00:00.000000 to 1900.02
+== schemes: 0
+== naans
+== naan classes (E=ezid ARK, N=non-ezid ARK, D=DOI or shadow ARK)
+         internal testing lines             0
+               resolution lines             0
+# ======== 2017.12.31_23:47:58.683977 to 2018.01
+== schemes: 3
+         218 not registered  ark
+           7 not registered  <somefile>
+           2 not registered  <phphack>
+== naans
+          54 E Duke University  ark:87924
+          50 E The Smithsonian Institution  ark:65665
+          35 N Princeton University  ark:88435
+          34 N People, Groups, and Institutions as Agents  ark:99166
+          19 E University of California Berkeley  ark:28722
+          17 E National Center for Atmospheric Research  ark:85065
+           4 E Université Claude Bernard Lyon 1  ark:47881
+           3 E Utah State University  ark:85142
+           2 E University of Nevada, Las Vegas University Libraries  ark:62930
+== naan classes (E=ezid ARK, N=non-ezid ARK, D=DOI or shadow ARK)
+         149 E
+          69 N
+         internal testing lines            18
+               resolution lines           245
+           non-resolution lines           255
+# ======== 2018.01.01_00:00:00.236711 to 2018.02
+== schemes: 4
+         192 not registered  ark
+          19 not registered  <somefile>
+           8 not registered  <phphack>
+           1 not registered  islandora/object/articles
+== naans
+          70 E Duke University  ark:87924
+          38 E The Smithsonian Institution  ark:65665
+          33 N Princeton University  ark:88435
+          19 N People, Groups, and Institutions as Agents  ark:99166
+          13 E National Center for Atmospheric Research  ark:85065
+          12 E University of California Berkeley  ark:28722
+           2 E Biocode Commons  ark:21547
+           2 E Utah State University  ark:85142
+           2 E Université Claude Bernard Lyon 1  ark:47881
+           1 E University of Nevada, Las Vegas University Libraries  ark:62930
+== naan classes (E=ezid ARK, N=non-ezid ARK, D=DOI or shadow ARK)
+         140 E
+          52 N
+         internal testing lines            18
+               resolution lines           238
+           non-resolution lines           262
+  -- (end test/transaction_log_test)
+# ======== 2020.06.16_02:37:10.729370 to 2020.07
+      * Log end at 2020.06.16_02:40:02.038848
+== schemes: 4
+         206 not registered  ark
+          25 not registered  addgene
+           2 not registered  <somefile>
+           1 not registered  RRID
+== naans
+         152 N People, Groups, and Institutions as Agents  ark:99166
+          24 E The Smithsonian Institution  ark:65665
+          14 E Duke University  ark:87924
+           4 E Université Claude Bernard Lyon 1  ark:47881
+           3 N Princeton University  ark:88435
+           2 E National Center for Atmospheric Research  ark:85065
+           2 E Iowa State University  ark:87292
+           1 E UTA Institute of Classical Archaeology  ark:87610
+           1 E California Digital Library  ark:13030
+           1 E Utah State University  ark:85142
+           1 E Biocode Commons  ark:21547
+           1 E Michigan State University Libraries  ark:85335
+== naan classes (E=ezid ARK, N=non-ezid ARK, D=DOI or shadow ARK)
+         155 N
+          51 E
+         internal testing lines             6
+               resolution lines           240
+           non-resolution lines           262
+
+============================ TOTALS ================================
+# from log test/transaction_log_test
+# ======== 1900.01.01_00:00:00.000000 to 2020.06.16_02:40:02.038848
+== schemes: 6
+         616 not registered  ark
+          28 not registered  <somefile>
+          25 not registered  addgene
+          10 not registered  <phphack>
+           1 not registered  islandora/object/articles
+           1 not registered  RRID
+== naans
+         205 N People, Groups, and Institutions as Agents  ark:99166
+         138 E Duke University  ark:87924
+         112 E The Smithsonian Institution  ark:65665
+          71 N Princeton University  ark:88435
+          32 E National Center for Atmospheric Research  ark:85065
+          31 E University of California Berkeley  ark:28722
+          10 E Université Claude Bernard Lyon 1  ark:47881
+           6 E Utah State University  ark:85142
+           3 E University of Nevada, Las Vegas University Libraries  ark:62930
+           3 E Biocode Commons  ark:21547
+           2 E Iowa State University  ark:87292
+           1 E UTA Institute of Classical Archaeology  ark:87610
+           1 E California Digital Library  ark:13030
+           1 E Michigan State University Libraries  ark:85335
+== naan classes (E=ezid ARK, N=non-ezid ARK, D=DOI or shadow ARK)
+         340 E
+         276 N
+         internal testing lines            42
+               resolution lines           723
+           non-resolution lines           779
+         internal testing lines            42
+                pre-start lines             0
+
+         total resolution lines           723
+     total non-resolution lines           779
+        sum of the above totals          1544
+          error lines processed             0
+          total lines processed          1502
