@@ -50,9 +50,9 @@ naan_dates: naan_registry.txt
 naan_registry.txt: $(PUB)/naan_registry.txt
 	cp -p $^ $@
 
-test: all pytest
+test: venv all pytest
 
-pytest: venv/bin/pytest
+pytest: venv/bin/pytest venv
 	venv/bin/pytest -q
 
 venv/bin/pytest: venv

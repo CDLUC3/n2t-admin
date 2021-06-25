@@ -486,8 +486,9 @@ def next_report(starttime, when):
 # MAIN
 
 # some constants
-tlogdir = "/apps/n2t/tlog"
-n2tlog = "/apps/n2t/sv/cur/apache2/logs/transaction_log"
+home = "/apps/n2t"
+tlogdir = home + "/n2t_create/tlog"
+n2tlog = home + "/sv/cur/apache2/logs/transaction_log"
 tmplog = "/tmp/tltail"
 
 start_of_time = "1900"

@@ -769,6 +769,7 @@ do
 			echo Error running ln -s $p eggnog
 	}
 
+	echo Current directory: $(pwd -P)
 	(cd $p
 		perl Makefile.PL INSTALL_BASE=$sv
 		$gmake

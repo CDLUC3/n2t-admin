@@ -20,11 +20,9 @@ then
 	cat << EOT
 Usage: $0 [ init | config | httpd [ new ] | build | install | realclean ]
 
-# XXX make certs use LetsEncrypt
-
 Use these instructions and script to set up N2T on a new AWS EC2 instance.
-Pick any name of the user role account that will administer the service,
-AS LONG AS IT'S n2t and the home directory is /apps/n2t (yes, limiting).
+Set up a role account 'n2t' and make the home directory /apps/n2t. (Yes, it
+should have been abstracted better, but this would take some time to do.)
 Start by assuming the identity of the user,
 
    \$ sudo su - n2t
@@ -48,7 +46,8 @@ and follow the instructions below, as well as any printed by this script.
         scp -p n2t-dev.n2t.net:warts/.pswdfile.n2t.oca ~/warts/.pswdfile.n2t
 
   4.  Make sure that your system has web server certs in ~/warts/ssl/n2t.net
-      that match the cert filename assignments in ~/$envsh.
+      that match the cert filename assignments in ~/$envsh. In CDL's
+      LetsEncrypt setup, these should match by default.
 
 This next step takes several minutes: run (interactively, don't background)
 
@@ -395,9 +394,10 @@ grep "email.*$fakeuser" $gtcf && {
 	export PATH=$home/local/bin:$PATH
 	make			# sets up .bashrc and svu defs; runs "svu init"
 	# sets up of crontab, which we need to disable for now
-	crontab /dev/null
-	echo "Disabling crontab for now. Re-enable with (cd n2t_create; make)"
 		# XXX do not background or redirect, since it asks questions!
+	crontab /dev/null
+	admegn cert_check restart	# install certs from LetsEncrypt
+	echo "Disabling crontab for now. Re-enable with (cd n2t_create; make)"
 	echo
 	echo Now logout and login again.
 	echo
@@ -437,7 +437,6 @@ grep "email.*$fakeuser" $gtcf && {
 	}
 
 	echo -n "SVU status, pre-make_instance: " ; svu status
-	echo Current directory: $(pwd --physical)
 
 	echo 'Running ./make_instance build ..., output in "make_instance_errs"'
 	#./make_instance build mongodb_pm n2t > make_instance_errs 2>&1 || {
