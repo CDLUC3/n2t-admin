@@ -392,6 +392,7 @@ grep "email.*$fakeuser" $gtcf && {
 	rm -fr n2t_create	# if it exists the rename below won't work
 	mv n2t-admin n2t_create		# simple rename
 	cd n2t_create
+	export PATH=$home/local/bin:$PATH
 	make			# sets up .bashrc and svu defs; runs "svu init"
 	# sets up of crontab, which we need to disable for now
 	crontab /dev/null
