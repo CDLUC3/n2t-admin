@@ -453,7 +453,8 @@ grep "email.*$fakeuser" $gtcf && {
 			# under the 'cur' version, our default logged-in state
 	echo done svu rollout
 	echo
-	echo Important: now logout and login again
+	echo Review ~/n2t_create/make_instance_errs for obvious errors
+	echo Then logout and login again
 	echo
 }
 
