@@ -43,7 +43,7 @@ and follow the instructions below, as well as any printed by this script.
 
   3.  Copy ~/warts/.pswdfile.n2t.oca from another host, eg,
 
-        scp -p n2t-dev.n2t.net:warts/.pswdfile.n2t.oca ~/warts/.pswdfile.n2t
+       scp -p n2t-dev.n2t.net:warts/.pswdfile.n2t.oca ~/warts/.pswdfile.n2t
 
   4.  Make sure that your system has web server certs in ~/warts/ssl/n2t.net
       that match the cert filename assignments in ~/$envsh. In CDL's
