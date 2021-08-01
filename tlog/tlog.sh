@@ -2,6 +2,6 @@
 
 # Invoke transaction log python script via its virtual env
 
-dir=/apps/n2t/tlog
+DIR=/apps/n2t/n2t_create/tlog
 
-$dir/venv/bin/python $dir/bin/tlog.py "$@"
+$DIR/venv/bin/python $DIR/bin/tlog.py "$@"

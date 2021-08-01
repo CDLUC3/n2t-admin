@@ -111,13 +111,19 @@ sub element_check { my( $Rerrs, $k, $v )=@_;	# one key/value pair
 sub validate_naans { my( $naanfile, $contact_info, $linenums )=@_;
 
 	my ($c, $s, @uchars);
-	open FH, "<:encoding(UTF-8)", $naanfile or
-		die();
 	my $Rerrs = [];		# this gets returned
 	my $ecnt = 0;		# current entry (count)
 	my $msg;
 	defined($linenums) and
 		$linenumbers = $linenums;
+
+	if (! $naanfile) {
+		return (0, "NOT OK - Empty NAAN file argument", $Rerrs);
+	}
+	if (! open FH, "<:encoding(UTF-8)", $naanfile) {
+		return (0, "NOT OK - Could not open NAAN file: $naanfile",
+			$Rerrs);
+	}
 
 	$/ = "";		# paragraph mode
 	while (<FH>) {		# read file an entry (block) at a time
@@ -197,6 +203,10 @@ sub validate_naans { my( $naanfile, $contact_info, $linenums )=@_;
 		}
 	}
 	close FH;
+
+	if ($ecnt < 1) {
+		return (0, "NOT OK - no NAAN entries found)", $Rerrs);
+	}
 
 	my @reserved =			# reserved NAANs, not assigned to orgs
 		qw( 12345 99152 99166 99999 );

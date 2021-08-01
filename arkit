@@ -19,6 +19,7 @@ ezcreds=					# ezid credentials
 force=						# init flag
 noexec=						# init flag
 test=						# init flag
+uark=''						# user supplied ARK
 
 summary="
     $me init [ Options ] Filename 'Creator|Title|Date' ['Subject[|...]']
@@ -54,6 +55,9 @@ XXX big kludge next; should do this directly via n2t API
        $resolver/<ARK>.vN resolves to version N (using Suffix Passthrough).
 
 OPTIONS
+    -a, --ark ARK_id
+       The "--ark" option uses an existing ARK_id (eg, the result of a
+       previous run that failed to upload) instead of creating a new ARK.
     -n, --noexec
        The "--noexec" option does a dry run, informing you what actions it
        would take but without actually taking those actions.
@@ -226,6 +230,7 @@ function arkit_init {
 		--force|-f)	force=1 ;;
 		--test|-t)	test=1 ;;
 		--noexec|-n)	noexec='+' ;;	# boolean/sigil
+		--ark|-a)	uark=$2; shift;;
 		*)
 			echo "Error: unknown option $1" 1>&2
 			return 1
@@ -233,7 +238,6 @@ function arkit_init {
 		esac
 		shift
 	done
-
 	File=${1:-}	; shift
 	Meta=${1:-}	; shift
 	Subjects=${1:-}	; shift
@@ -281,7 +285,11 @@ function arkit_init {
 	# reserved status allows us to delete the ARK if later we need to abort
 	local idstatus=reserved
 	local ark
-	if [[ "$noexec" ]]
+	if [[ "$uark" ]]
+	then
+		ark=$uark
+		echo Using user-supplied ARK: $ark
+	elif [[ "$noexec" ]]
 	then
 		echo $noexec ezcl p "$ezcreds" \
 			mint $ezshoulder _status $idstatus
@@ -370,7 +378,7 @@ EOT
 	# this next line seems to be needed to get a final \n (bash bug?)
 	overall_metadata+=$'\n'
 	local keyword			# add keyword metadata
-	for keyword in "${keywords[@]}"
+	for keyword in "${keywords[@]:-}"
 	do
 		[[ ! "$keyword" ]] &&	# skipping blank keywords
 			continue

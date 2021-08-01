@@ -1551,7 +1551,8 @@ function pfx_validate {
 	local s Nnaans Nshoulders Nebi Npxc	# Numbers of prefixes
 
 	echo - Validating $naanFile
-		admegn validate_naans $naanFile $shdrFile || return 1
+		admegn validate_naans $naanFile || return 1
+		#admegn validate_naans $naanFile $shdrFile || return 1
 	Nnaans=$( grep -c '^what:[ 	]*[0-9]' $naanFile )
 	#echo Nnaans=$Nnaans
 
