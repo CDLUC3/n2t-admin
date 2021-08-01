@@ -6,7 +6,7 @@ APPHOME=/apps/n2t
 PUB=$(APPHOME)/sv/cur/apache2/htdocs/e/pub
 PFX_SOURCES= $(PUB)/naan_registry.txt $(PUB)/naan_table.txt $(PUB)/shoulder_registry.txt $(PUB)/ebi.anvl
 INSTALL= $(APPHOME)/local/bin/tlog
-ALL= prefixes.txt doi_naans.txt naan_table.txt bin/tlog $(INSTALL)
+ALL= venv prefixes.txt doi_naans.txt naan_table.txt bin/tlog $(INSTALL)
 # should there be a separate install step?
 
 
