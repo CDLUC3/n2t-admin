@@ -10,6 +10,7 @@
 	new = bold yellow
 [push]
 	default = simple
+#config --global init.defaultBranch main
 [alias]
 	alias = ! git config --get-regexp ^alias\\. | sed -e s/^alias\\.// -e s/\\ /\\ =\\ /
 	list  = branch -a

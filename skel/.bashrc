@@ -216,6 +216,10 @@ function mm()   { "$@" | 2>&1 less ; }
 function g()	{ git "$@" ; }
 # usage:  gr pattern any_command
 function gr() { $2 $3 $4 $5 $6 $7 $8 $9 | grep -i "$1" ; }
+function grep() { command grep -d skip "$@"; }
+function grepi() { command grep -id skip "$@"; }
+# -d skip means "skip directories"; -r after it says "but do recurse"
+function grepr() { command grep -id skip -r "$@"; }
 function hd()   { "$@" | head -5 ; }
 function hd1()  { "$@" | head -1 ; }
 function hd2()  { "$@" | head -10 ; }

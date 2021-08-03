@@ -1,0 +1,4 @@
+#! /usr/bin/env bash
+
+granvl 'print v(":"), "\t", v("name"), "\t", v("manager"), "\n"; 0' master_shoulders.txt > xx
+

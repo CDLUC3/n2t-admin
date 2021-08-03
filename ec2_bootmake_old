@@ -1,268 +1,625 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
-# Author: John Kunze, jak@ucop.edu
-# Copyright (c) 2013-2015, UC Regents.  BSD-type open source license.
+# XXX don't enable crontab until after first system rollout!!
 
-# xxx document dependencies on Bash 4.1 or greater (yyy ginstall?)
-# xxx prior work in ~/local on n2tstage
+[[ -f ~/.bashrc ]] &&
+	source ~/.bashrc	# which might not exist yet
 
-VERSION=0.1			# version of this script
+set -u			# now make the use of unset variables throw an error
+#hgrc=~/.hgrc
+envsh=warts/env.sh
+fakeuser=samsmith
 
-me=boot_install_n2t
-create=n2t_create
-targz=$create.tar.gz
-from=noid@noid-stage.cdlib.org:/noid/n2t_create/$targz
+linux2=true		# xxx remove this later
 
-rhodecode=hg.cdlib.org
-local=$HOME/local
-lbin=$local/bin
-svudef='function svu { eval `svu_run "$PS1"\|\|\|b $*`; }'
-
-if [ "$1" != go ]
+cmd=${1:-}
+shift
+if [[ "$cmd" != init && "$cmd" != config && "$cmd" != realclean &&
+	"$cmd" != build && "$cmd" != install && "$cmd" != httpd ]]
 then
-cat << EOTOUTER
+	cat << EOT
+Usage: $0 [ init | config | httpd [ new ] | build | install | realclean ]
 
-Usage:
-        $me go
+    XXX need to update this for git after hg->git migration
+Use these instructions and script to set up N2T on a new AWS EC2 instance.
+Pick the name of the user role account that will administer the service.
+Let's call it "n2t". Start by assuming the identity of the user,
 
-For an Amazon EC2 instance, this is a set of BASH (4.1 or better) steps
-to install N2T on host H under login L's home directory ($HOME).  You
-will need read access to the mercurial repositories on $rhodecode,
-for example (you will need to change the password below),
+   \$ sudo su - n2t
 
-cat > ~/.hgrc << EOT
+and making sure you're in n2t's home directory. To set up gather information
+to allow yum installation, shell startup files, and other foundation files,
+answer the questions asked by running
+
+      $0 init
+
+and follow the instructions below, as well as any printed by this script.
+
+  1.  Verify that you have correct values for username and cdl.username
+      inside your ~/.hgrc file (~/.gitconfig file).
+
+  2.  Add your instance's ssh key to bitbucket.org (github.com).
+
+      Login to https://bitbucket.org/cdl, click on your avatar, then on
+      "bitbucket settings" -> "add ssh key" (or something like that).
+      View your key with "cat ~/.ssh/id_rsa.pub" and paste it in when
+      bitbucket asks for it and add it to other n2t hosts as needed.
+
+  3.  Copy into ~/warts/.pswdfile.n2t the same from from another host, eg,
+
+        scp -p n2t-dev.n2t.net:warts/.pswdfile.n2t ~/warts/
+
+  4.  Make sure that your system people have put your web server certs
+      file into a ~/ssl/YYYY-MM-DD directory, and match the cert filename
+      assignments in ~/$envsh to the correct files.
+
+This next step takes several minutes: run (interactively, don't background)
+
+      $0 config
+
+You may need to reboot. Either way, it's a good idea to logout and login
+again to make sure the startup files are working. Then do
+
+      $0 build
+
+If over time a system patch updates apache, you'll do this again (as it
+actually calls "$0 httpd" to re-import the system apache.
+
+Now logout and login again. Then run
+
+      $0 install
+
+Finally have your system people install ~/n2t_create/n2t.service with
+systemd so that the service comes up and shuts down properly during system
+reboots.  You'll also want to have web service monitoring set up, eg, Nagios.
+Occasionally, run "$0 httpd" to rebuild from newly patched Apache server.
+
+To start over and prepare for an "init" on a clean system, do
+
+      $0 realclean
+
+EOT
+	exit
+fi
+
+function ec2_init {
+
+	local hostname class mailto def_hostname def_class def_mailto
+	local p		# prompt strings
+
+	def_hostname=$( hostname -f )
+	def_class=loc
+	def_mailto='samsmith at example dot org'	# use wrong syntax
+		# to trigger downstream external warnings if set to default
+
+	# get $hostname
+	read -t 60 -p "Enter hostname (default $def_hostname): " hostname || {
+		echo Error: the hostname must be defined 1>&2
+		return 1
+	}
+	local h=$( sed 's/  *//g' <<< "$hostname" )
+	if [[ ! "$h" ]]			# if no nonblank
+	then
+		hostname="$def_hostname"
+	else
+		hostname="$h"
+	fi
+
+	p="Enter service class: [loc(default)|dev|stg|prd] "
+	read -t 60 -p "$p" class || {
+	       echo Error: the service class must be defined 1>&2
+	       return 1
+	}
+	[[ "$class" ]] ||
+	       class="$def_class"
+	case "$class" in
+	loc|dev|stg|prd) ;;
+	*)     echo Error: service class must be one of \
+			       loc, dev, stg, or prd 1>&2
+	       return 1 ;;
+	esac
+
+	p="Enter email address for system notifications: "
+	read -t 60 -p "$p" mailto || {
+		echo Error: the service mailto must be defined 1>&2
+		return 1
+	}
+	[[ "$mailto" ]] ||
+		mailto="$def_mailto"
+
+	local create=
+	if [[ -e "$envsh" ]]
+	then
+		p="Backup and overwrite existing $envsh file? "
+			p+="[y/n] (default no): "
+		read -t 60 -p "$p" || {
+			echo Error: response required 1>&2
+			return 1
+		}
+		[[ "$REPLY" =~ ^[yY] ]] && {
+			create=yes
+			echo ok, keeping existing file
+		}
+	else
+		create=yes
+	fi
+
+	# If we get here, we're committed to actual filesystem mods.
+	mkdir -p ssl warts/ssl
+
+        [[ ! -e ~/.ssh/id_rsa.pub ]] && {
+		echo OK to answer the next few questions with defaults.
+		ssh-keygen -t rsa         # enter no filename, no passphrase
+	}
+	echo This is your public key for copy/paste into hg repo.
+	cat ~/.ssh/id_rsa.pub
+
+	[[ -e $hgrc ]] || {
+		echo creating generic $hgrc '<---' edit this change user names
+		cat > $hgrc << EOT
 
 [ui]
-username = John Kunze <jak@ucop.edu>
+# EDIT NEXT LINE
+username = Sam Smith <samsmith@example.org>
 merge=internal:merge
+ssh = ssh -C
 
 [auth]
-cdl.prefix   = https://hg.cdlib.org
-cdl.username = jak
-cdl.password = xxxxxx
+cdl.prefix   = ssh://hg@bitbucket.org/cdl
+# EDIT NEXT LINE
+cdl.username = $fakeuser
 
-[hostfingerprints]
-hg.cdlib.org = 25:FF:CD:90:D0:E7:56:2F:74:2E:B0:77:2B:A5:2B:6C:4B:A6:76:1E
+EOT
+	}
+
+	[[ "$create" ]] && {			# create $envsh
+		[[ -e "$envsh" ]] &&
+			cp -p "$envsh" "$envsh.bak"
+		cat > $envsh << EOT
+#!/bin/sh
+
+# This shell script sets some instance-specific environment variables.
+# The build_server_tree script (from the eggnog source code) reads these
+# for host and certificate configuration. The EGNAPA_HOST_CLASS here should
+# match what is in the eggnog_conf file; this copy is (cached) for speed
+# and it helps bootstrapping the first service rollout.
+
+export EGNAPA_HOST=$hostname
+export EGNAPA_HOST_CLASS=$class		# eg, one of dev, stg, prd, loc
+
+# Define fullpaths to the certificate files. Use EGNAPA_SSL_CERTFILE for
+# the main certificate and EGNAPA_SSL_KEYFILE for the pirviate key.
+
+ssldir=/apps/n2t/warts/ssl/n2t.net
+# see \$ssldir/README for file choices
+export EGNAPA_SSL_CERTFILE=\$ssldir/fullchain.pem
+export EGNAPA_SSL_KEYFILE=\$ssldir/privkey.pem
+
+# Define email address to receive system notifications, eg, from crontab.
+export EGNAPA_MAILTO='$mailto'
 
 EOT
 
-Then, use yum to install some basics.  In the home directory, do
+		cp -pr ~/ssl ~/warts/
+		echo Created $envsh -- done.
+		#now you must copy your cert files, eg, \
+		#	from ssl/2022-03-30/* to warts/ssl/
+	}
+	return 0
+}
 
-DONT CHANGE THIS!!
-CHANGE min_plus_rest
-[ see script "min_plus_rest" ]
-  sudo yum -y group install "Development Libraries"
-  sudo yum -y group install "Development Tools"   # gcc
-  sudo yum -y group install "Web Server"          # mod_ssl, ExtUtils/MakeMaker
-  sudo yum -y install hg
-  sudo yum -y install 'perl(DB_File)' 'perl(BerkeleyDB)'
-  sudo yum -y install 'perl(Data::UUID)' 'perl(Test::More)'
-  sudo yum -y install 'perl(Log::Log4perl)'
+# All we need to do is the minimum to bring up Apache successfully,
+# since we'll overwrite most inherited configuration. However, these
+# snapshot copies we make here will be incorporated over and over
+# when the n2t/eggnog instance is rebuilt (very frequent operation).
 
-DONT CHANGE THIS!!
-CHANGE min_plus_rest
-# for shoulder maintenance
-  sudo yum -y install libxml2-devel libxslt-devel python-devel
-  sudo yum -y install libxml2-python libxslt-python
-  sudo yum -y install python-pip
-  sudo yum -y install python-virtualenv
-  pip install lxml
-  ....
-DONT CHANGE THIS!!
-CHANGE min_plus_rest
-[ see script "min_plus_rest" ]
+# XXX after system patch, check for new files and re-snapshot!!
 
-  [ on mac (using ~/sv/cur/perl5/perlbrew/bin/cpanm Log::Log4perl ]
-  #? sudo yum --enablerepo=epel install awstats		# apache web log stats
-				# can use webalizer (mac?) to visualize; see
-				# /usr/share/awstats/wwwroot/cgi-bin/awstats.pl
+# Give first arg as "new" (default "cur") to install in ~/sv/new
 
-From the shell, do
+function do_apache_httpd24 {
 
-  hg clone http://hg.cdlib.org/n2t_create
-  cd n2t_create
-  make			# sets up svu defs; runs "svu init"
+	local sysap=/etc/httpd		# system apache
+	local aptop=~/sv/${1:-cur}/apache2
+	echo Running do_apache_httpd24 in $aptop.
 
-Then do the following, which sources .bashrc, sets the SVU mode correctly,
-builds Apache and Eggnog, rolls it out, and sets up a skeleton crontab..
+	rm -fr $aptop
+	mkdir $aptop
 
-  xxx use EGNAPA_SSL_{CERT,KEY,CHAIN}FILE if you want non-self-signed certs
-  source ~/.bashrc	# so we can do svu new
-  svu new
-  ./make_instance build httpd n2t 2>&1 > berrs
+	cd $aptop			# where we copy stuff to
 
-  svu rollout	# ok as no users yet, and this puts all of interest under 'cur'
-		# which is our default logged-in state
-  svu cur
-  set_crontab go	# all actions commented out; edit as desired
-  pd $sv/build/eggnog
-  n2t rollout
-  n2t test		# some tests of commented out content in crontab
+	mkdir -p bin cgi-bin htdocs logs var/run
+	cp /usr/sbin/httpd bin/httpd
+	cp -Lpr $sysap/modules .
+	cp -pr $sysap/conf.modules.d .	# keep these verbatim,
+		# eg, /etc/httpd/conf.modules.d/00-base.conf; later we'll
+		# override selectively via build_server_tree, eg, 00-ssl.conf
+	cp -pr $sysap/conf .
+ 	cp $sysap/conf/magic conf/
+	cp /etc/mime.types conf/
+	cp -pr /etc/httpd/conf.d .	# later build_server_tree removes these
+	mv conf.d/ssl.conf{,.noop}	# disable SSL so we come up w.o. certs
+	cp /etc/httpd/conf/httpd.conf conf/httpd.conf.sys	# one-time save
+	perl -pE '/^(Server|Document)Root/ and s/^/#/;
+		/^Listen/ and s/.*/Listen 18880/' conf/httpd.conf.sys \
+		> conf/httpd.conf
+	cat >> conf/httpd.conf << EOT
 
-For code changes,
+PidFile $aptop/var/run/httpd.pid
+DefaultRuntimeDir $aptop/var/run
+EOT
+	cat > README << EOT
+This README file and the foundation structure of the enclosing directory
+were created from scratch by the ec2_bootmake script. This directory supports
+a public-facing Eggnog server on this host, as well as test servers.
 
-  cd $sv/build/eggnog
-  EITHER
-     xxx maybe "make clean"?
-     n2t import		# to import new stuff from $rhodecode
-  OR
-     vim, emacs, hack hack hack
-     make test		# or "blib t/apachebase.t" && "blib t/service_n2t.t"
-     hg -m com		# optional, but "n2t test" complains if you don't
-     hg push		# good practice
-  THEN
-  n2t rollout		# brings down the public-facing server for < 1sec
-  n2t test		# should clear most tests
-  	xxx on SLES the 3 SPT tests will fail until you "apache restart"
+The part of its structure that survives repeated rebuilding of the public
+and test servers mirrors the system-installed Apache HTTPD 2.4 server.
+Eggnog doesn't use all the directory structure (eg, conf.d/*), and rebuilds
+just those parts it needs.
+EOT
 
-XXXXXXXX what about python libxml?
-
-xxx ^^^ new 
-
-Assuming you're logged in as L, add the following to your .bashrc file:
-
-	PATH=\$HOME/local/bin:\$PATH
-	$svudef
-
-You'll need to identify host H's external web name (often different from
-what hostname returns).
-
-	cd
-	mkdir warts
-	cat > warts/env.sh <<- EOTEXT
-	#!/bin/sh
-	HOSTNAME=n2t.example.org
-	export HOSTNAME
-	EOTEXT
-
-To customize L's account for your use, you ("sam") might want to
-
-	$ mkdir $HOME/.profile.d/
-	$ ln -s ~sam/.bashrc $HOME/.profile.d/sam
-	$ cat > $HOME/.profile << EOTEXT
-	whoami=`who -m | awk '{ print \$1 }'`
-	if [ -f ~/.profile.d/\$whoami ] ; then
-		source ~/.profile.d/\$whoami
-	fi
-	EOTEXT
-
-Note that L's \$PATH must support compiling and linking, eg,
-
-    export PATH=\$HOME/local/bin:/usr/sfw/bin:/usr/sfw/sbin:\\
-         /usr/ccs/bin:/usr/local/GNU/bin:/usr/local/edina/bin:\\
-         /usr/local/edina/coreutils/bin:/usr/local/bin:\\
-         /usr/l ocal/edina/jdk1.6.0_25/bin:/usr/X/bin:
-
-The new path component need not exist and will be created if need be.
-The function definition sets up an "svu" command (Service Version Utility)
-that will be created later.  It uses environment variables such as
-PERL_INSTALL_BASE and PERL5LIB, but leaves them unchanged in the end.
-
-If you already have mercurial ("hg") on your system, run
-
-	cd
-	hg clone http://$rhodecode/n2t_create
-
-Otherwise, copy $from into $HOME and
-
-	$ cd
-	$ gunzip -c $targz | tar xf -
-
-Either way you should now see $create in L's home directory.  If you're
-reading this you may have already done most of the above steps.
-
-EOTOUTER
-
-#    export LD_LIBRARY_PATH=/usr/sfw/lib:\\
-#         /usr/sfw/lib/gcc/sparc-sun-solaris2.10/3.4.3:/usr/ccs/lib:\\
-#         /usr/local/GNU/lib:/usr/local/edina/lib:/usr/local/lib:/usr/X/lib
-
-exit 0
-fi
-
-echo "This script is for documentation only right now."
-exit 1
-
-# yyy would be nice if we could rely on mkdir -p being there
-#     for now we have to keep lbin and mkdir args in sync
-(cd					# make sure we're in home directory
-	mkdir local local/bin > /dev/null 2>&1	# make sure we have local/bin
-)
-
-# # Build and install wget.
-# #
-# wgetv=wget-1.13.4
+# # xxx drop these?
+# 	ln -s /usr/sbin/httpd bin/httpd			# yyy needed?
+# 	ln -s /etc/mime.types conf/mime.types
+# 	ln -s $sysap/modules modules
+# 	ln -s $sysap/conf/magic conf/magic
+# 	ln -s $sysap/conf.modules.d conf.modules.d	# keep these verbatim,
+# 		# eg, /etc/httpd/conf.modules.d/00-base.conf; later we'll
+# 		# override selectively via build_server_tree, eg, 00-ssl.conf
 # 
-# echo =================== building $wgetv ===================
-# if [ ! -d $wgetv ]
-# then
-# 	wgettar=$wgetv.tar.gz
-# 	gunzip -c $wgettar | tar xf -
-# fi
+# 	cp /etc/httpd/conf.d/* conf.d	# later build_server_tree removes these
+# 				# xxx but are they even needed to start?
+# 	cp /etc/httpd/conf/httpd.conf conf/httpd.conf.sys	# one-time save
+# 	perl -pE '/^(Server|Document)Root/ and s/^/#/;
+# 		/^Listen/ and s/.*/Listen 18880/' conf/httpd.conf.sys \
+# 		> conf/httpd.conf
+# 	cat >> conf/httpd.conf << EOT
 # 
-# (cd $wgetv
-# 	./configure --prefix=$local --without-ssl
-# 	make
-# 	make install
-# )
+# PidFile $aptop/var/run/httpd.pid
+# DefaultRuntimeDir $aptop/var/run
+# EOT
+# 	rm  conf.d/ssl.conf		# disable SSL stuff for now
+# 	#cp conf.d/ssl.conf conf.d/ssl.conf.sys
+# 	#perl -pE '/^SSLCert/ and s/^/#/;
+# 	#	/^Listen/ and s/.*/Listen 18443/' conf.d/ssl.conf.sys \
+# 	#		> conf.d/ssl.conf
+}
 
-#v# # Now fetch bash and build it.
-#v# #
-#v# bashv="bash-4.2.53"
-#v# 
-#v# echo =================== fetching/building $bashv ===================
-#v# if [ ! -d $bashv ]
-#v# then
-#v# 	bashtar=$bashv.tar.gz
-#v# 	if [ ! -f $bashtar ]
-#v# 	then
-#v# 		mirror=http://ftpmirror.gnu.org/bash/
-#v# 		echo fetching $bashtar
-#v# 		wget -nd -q $mirror/$bashtar
-#v# 	fi
-#v# 	gunzip -c $bashtar | tar xf -
-#v# fi
-#v# 
-#v# (cd $bashv
-#v# 	echo Starting configure
-#v# 	./configure --prefix=$local
-#v# 	echo Starting make
-#v# 	make
-#v# 	make install
-#v# )
+[[ "$cmd" == httpd ]] && {
+	do_apache_httpd24 "$@"
+	exit
+}
 
-# Install the svu_run bash script and initialize the SVU skeleton.
-#
-echo =================== initializing SVU ===================
+[[ "$cmd" == init ]] && {
+	ec2_init
+	exit
+}
 
-cp -p svu_run $lbin
-chmod 755 $lbin/svu_run
-hash -r			# to make new executable visible
-bash -lc 'svu init'
-if [ "$?" -ne 0 ]
-then
-	echo 'Problem running "svu init".'
-	echo "Did you put $lbin in your PATH?"
-	echo "Did you define the 'svu' function in ~/.bashrc?"
-	echo "   $svudef"
+[[ "$cmd" == realclean ]] && {
+	cd ~
+	rm -fr \
+		README backups/ batches/ binders \
+		init.d/ local/ logs/ minters \
+		n2t_create/ pfx_harvest/ sv/ warts/README \
+		.cpanm/ .eggnog/ .cache/ \
+		.bashrc .bash_profile .vimrc .svudef
+
+	sudo yum -y group erase "Development Tools"
+	sudo yum -y group erase "Web Server"
+	sudo yum -y erase mod_ssl libdb hg git
+	sudo yum -y erase 'perl(DB_File)'
+	sudo yum -y erase 'perl(BerkeleyDB)'
+	sudo yum -y erase 'perl(Data::UUID)' 'perl(Test::More)'
+	sudo yum -y erase 'perl(Time::HiRes)'
+	sudo yum -y erase 'perl(Try::Tiny)'
+	sudo yum -y erase 'perl(Safe::Isa)'
+	sudo yum -y erase 'perl(Log::Log4perl)'
+	sudo yum -y erase 'perl(XML::LibXML)' 'perl(XML::LibXSLT)'
+	sudo yum -y erase 'perl(App::cpanminus)'
+	sudo yum -y erase 'perl(CGI)'
+	sudo yum -y erase python3		# for transition
+	sudo yum -y erase jq			# for Internet Archive API
+	sudo yum -y erase golang		# nice, but not essential
+	sudo yum -y erase htop
+	sudo yum -y erase glances
+	#sudo amazon-linux-extras erase -y vim
+	#sudo amazon-linux-extras erase -y postgresql11
+	# XXX not removing .hgrc or .gitconfig
+	echo
+	echo Now logout and login again. If lots of system updates occurred, you should reboot first.
+	echo
+	exit
+}
+
+source ~/warts/env.sh
+
+# If we get get here, $cmd was "go", so full steam ahead.
+# yyy ask for more info to get $hgrc correct with init
+
+grep "^cdl.username.*$fakeuser" $hgrc && {
+	echo "Error: you first need to edit values in $hgrc"
 	exit 1
-fi
+}
 
-echo "finishing without (a) installing bash and (b) run bash -lc"
-exit
+[[ "$cmd" == config ]] && {
+	# I I check into whether to use installonlypkgs; from "man yum.conf":
+	#   "installonlypkgs=<space separated list of packages>
+	#      Here you can provide a space-separated list of packages which
+	#      yum can install, but will never update."
 
-# -l says to behave like login shell and, eg, read .bashrc
-bash -lc 'svu new; ./make_instance build all'
+	sudo yum -y update			# update to latest OS version
+	sudo amazon-linux-extras install -y epel	# for more packages
+				# eg, perl(BerkeleyDB), perl(Log::Log4perl)
 
-# Set up start/stop script (~/init.d/apache)
-mkdir $HOME/init.d > /dev/null 2>&1	# make sure we have ~/init.d
-cp -p apache $HOME/init.d
-chmod 755 $HOME/init.d
+	# To browse so-called "package groups", do "yum group list ids".
+	# yyy check return status?
+	#sudo yum -y group install "Development Libraries"
+	sudo yum -y group install "Development Tools"   # gcc
+	sudo yum -y group install "Web Server"    	# yyy needed?
 
-echo Done with $me.
-echo 'If the installation looks good, roll it out with "svu rollout"'
-echo \
-  'Before exploring, you will want to do "svu cur" (type just "svu" for help).'
+	#sudo yum -y install libdb4	# version 4 (v5 is default)
+	#sudo yum -y install libdb4-devel	# /usr/include/libdb4/db.h and
+						# /usr/lib64/libdb4/libdb.so
+	#sudo yum -y install libdb4-util		# plus db4_* CLI tools
 
-exit 0				# normal exit (success)
+	sudo yum -y install mod_ssl
+	sudo yum -y install libdb		# linux2 v5 is default
+	sudo yum -y install hg git
+	sudo yum -y install 'perl(DB_File)'	# used by, eg, admegn mload
+	sudo yum -y install 'perl(BerkeleyDB)'
+	sudo yum -y install 'perl(Data::UUID)' 'perl(Test::More)'
+	sudo yum -y install 'perl(Time::HiRes)'
+	sudo yum -y install 'perl(Try::Tiny)'
+	sudo yum -y install 'perl(Safe::Isa)'
+	sudo yum -y install 'perl(boolean)'
+	sudo yum -y install 'perl(CGI)'
 
+	# yyy why not install better version with cpanm?
+	sudo yum -y install 'perl(Log::Log4perl)'
+
+# xxx when system comes up, even partially, crontab is off and spewing
+#     error messages a little too easily --  how to stop?
+
+	# XML to parse and format XML blobs for inflection support
+	sudo yum -y install 'perl(XML::LibXML)' 'perl(XML::LibXSLT)'
+	sudo yum -y install 'perl(App::cpanminus)'
+	sudo yum -y install python3		# for transition
+	sudo yum -y install jq			# for Internet Archive API
+	sudo yum -y install golang		# nice, but not essential
+	sudo yum -y install htop		# monitoring tool
+	sudo yum -y install glances		# monitoring tool
+	sudo amazon-linux-extras install -y vim	# nice, but not essential
+	sudo amazon-linux-extras install -y postgresql11
+
+	#sudo yum-config-manager --add-repo \
+	#	https://repo.mongodb.org/yum/amazon/2/mongodb-org/4.0/x86_64/
+	## see https://confluence.ucop.edu/display/CUG/Amazon+Linux+2+User+Guide#AmazonLinux2UserGuide-Packages
+	#sudo yum -y install mongodb-org
+	#echo \
+#"WARNING: on AWS Linux2, this installation of mongodb configures host boot
+#scripts via systemd to automatically start mongo on port 27017" 1>&2
+	# on mac, need: brew install mongodb --with-openssl
+	# yyy never actually used telnet for this
+	#sudo yum -y install telnet	# network testing, eg, mongo replication
+	#rpm -V mongodb-org || {		# because it has gpgcheck disabled
+	#	sudo yum -y remove mongodb-org
+	#	echo error: mongodb-org installation failed to verify -- aborting.
+	#	exit 1
+	#}
+	# yyy (c) opened up access between mongo replicas on
+	# ports 27017-27027 and 47017-47027.
+
+	## Turn off mongod that $systemd is configured to start up by default.
+	#sudo systemctl disable mongod
+
+	# Try the hypothesis that we don't need these next two yum installs
+	# # XXX should confirm that these next are still needed
+	# # This next installs python's lxml module so that the mdsadmin script
+	# # (that creates DataCite datacenters) can run.
+	# sudo yum -y install libxml2-devel libxslt-devel python-devel
+	# sudo yum -y install libxml2-python libxslt-python python-pip
+	# pip install --install-option="--prefix=$sv" lxml
+	# # To use this module, .bashrc sets PYTHONPATH to something like
+	# # PYTHONPATH=$sv/lib64/python2.6/dist-packages
+
+	cd		# go to home directory
+	hg clone ssh://hg@bitbucket.org/cdl/n2t-admin
+	rm -fr n2t_create	# if it exists the rename below won't work
+	mv n2t-admin n2t_create		# simple rename
+	cd n2t_create
+	linux2=$( hg branches | grep linux2 )
+	[[ "$linux2" ]] && {
+		hg update linux2
+		echo note: repo should be set to Linux2 branch
+	}
+	make			# sets up .bashrc and svu defs; runs "svu init"
+	# sets up of crontab, which we need to disable for now
+	crontab /dev/null
+	echo "Disabling crontab for now. Re-enable with (cd n2t_create; make)"
+		# XXX do not background or redirect, since it asks questions!
+	echo
+	echo Good idea now to logout and login again.
+	echo
+
+	exit
+} # end of config
+
+# XXXX stop here, and make the user do source and svu
+#set +u			# cannot count on .bashrc to be squeaky clean
+#source ~/.bashrc	# so we can do svu new
+#svu new
+#set -u
+
+[[ "$cmd" == build ]] && {
+
+	# XXXX resume script here
+	#./make_instance build mongodb_pm httpd n2t > berrs 2>&1
+	# NB: ./make_instance requires "svu new", where installs go
+	#./make_instance build mongodb_pm n2t > berrs 2>&1 || {
+
+# XXX make user do svu new?
+	# XXX this script and make_instance call "hg" -- remember to convert
+	svu new || {
+		echo Bailing
+		exit 1
+	}
+	echo -n "SVU status, pre-make_instance: " ; svu status
+
+# XXX script takes over here
+	# XXX this script and make_instance call "hg" -- remember to convert
+	echo Creating bare-bones apache server.
+	do_apache_httpd24 new 	# copy and modify system version just
+				# enough to let us start a server
+
+	cd ~/n2t_create || {    # go back to build directory
+		echo Bailing
+		exit 1
+	}
+
+	echo 'Running ./make_instance build ..., output in "make_instance_errs"'
+	#./make_instance build mongodb_pm n2t > make_instance_errs 2>&1 || {
+# XXX do some prefix harvesting before this!
+	./make_instance build n2t > make_instance_errs 2>&1 || {
+		echo make_instance error -- bailing
+		svu cur
+		exit 1
+	}
+	echo 'Finished ./make_instance build ..."'
+	echo -n "SVU status, pre-svu-rollout: " ; svu status
+
+# XXX make user do svu rollout?
+	# now make installed stuff "current" (what was "new" will be "cur")
+	svu rollout	# ok as no users yet; this puts everything of interest
+			# under the 'cur' version, our default logged-in state
+	echo done svu rollout
+	echo
+	echo Important: now logout and login again
+	echo
+}
+
+[[ "$cmd" == install ]] && {
+
+	#svu cur	# make sure we're on current version before n2t rollout
+	#echo -n "SVU status, pre-n2t-rollout: " ; svu status
+
+	echo n2t rollout
+	n2t rollout	# takes care of dvcsid test
+
+	# yyy chicken & egg problem(?) with rollout, which depends on prefixes.
+	#     seems we might need to run "pfx hitrnt" before rollout?, but we
+	#     can't do that before we've rolled things out the first time
+	#     (or can we?)
+# XXX harvest files have come in before the 'make all' implied above
+# XXX and the below won't work until rollout,? because... why?
+#     since $sa/prefixes isn't in place?
+	#pfx hitrnt	# 2nd time might work? XXX
+	#n2t rollout
+
+	echo n2t test
+	n2t test		# test that things are more or less ok
+
+	#echo 'Now grab and install warts/.pswdfile.n2t from another system.'
+
+	#### IMPORTANT!
+	cat << EOT
+Ask your superuser:
+Please copy ~/n2t_create/apache.n2t to /etc/init.d/apache.n2t and set up chkconfig so that the N2T service comes up on machine (re)boot.
+
+When ready, adjust eggnog_conf values to turn on crontab for things like
+prefix harvesting, error checks, backups, etc.
+
+When all is stable, arrange for Nagios web service monitoring.
+
+To switch between two main utility directories, use "cd $sn; pd $se".
+
+EOT
+	exit
+}
+
+[[ "$cmd" == oldbuild ]] && {
+
+	# XXXX resume script here
+	#./make_instance build mongodb_pm httpd n2t > berrs 2>&1
+	# NB: ./make_instance requires "svu new", where installs go
+	#./make_instance build mongodb_pm n2t > berrs 2>&1 || {
+
+# XXX make user do svu new?
+	# XXX this script and make_instance call "hg" -- remember to convert
+	svu new || {
+		echo Bailing
+		exit 1
+	}
+	echo -n "SVU status, pre-make_instance: " ; svu status
+
+# XXX script takes over here
+	# XXX this script and make_instance call "hg" -- remember to convert
+	echo Creating bare-bones apache server.
+	do_apache_httpd24 new 	# copy and modify system version just
+				# enough to let us start a server
+
+	cd ~/n2t_create || {    # go back to build directory
+		echo Bailing
+		exit 1
+	}
+	echo 'Running ./make_instance build ..., output in "make_instance_errs"'
+	#./make_instance build mongodb_pm n2t > make_instance_errs 2>&1 || {
+# XXX do some prefix harvesting before this!
+	./make_instance build n2t > make_instance_errs 2>&1 || {
+		echo make_instance error -- bailing
+		svu cur
+		exit 1
+	}
+	echo 'Finished ./make_instance build ..."'
+	echo -n "SVU status, pre-svu-rollout: " ; svu status
+
+# XXX make user do svu rollout?
+	# now make installed stuff "current" (what was "new" will be "cur")
+	# ok as no users yet; this puts everything of interest
+	# under the 'cur' version, our default logged-in state
+	svu rollout || {
+		echo Bailing: svu rollout failed
+		exit 1
+	}
+	echo done svu rollout
+
+	svu cur	|| {	# make sure we're on current version before n2t rollout
+		echo Bailing: svu cur failed
+		exit 1
+	}
+	echo -n "SVU status, pre-n2t-rollout: " ; svu status
+
+	n2t rollout || {		# takes care of dvcsid test
+		echo Bailing: n2t rollout failed
+		exit 1
+	}
+
+	# yyy chicken & egg problem(?) with rollout, which depends on prefixes.
+	#     seems we might need to run "pfx hitrnt" before rollout?, but we
+	#     can't do that before we've rolled things out the first time
+	#     (or can we?)
+# XXX harvest files have come in before the 'make all' implied above
+# XXX and the below won't work until rollout,? because... why?
+#     since $sa/prefixes isn't in place?
+	#pfx hitrnt	# 2nd time might work? XXX
+	#n2t rollout
+
+	n2t test		# test that things are more or less ok
+
+	#echo 'Now grab and install warts/.pswdfile.n2t from another system.'
+
+	#### IMPORTANT!
+	cat << EOT
+Ask your superuser:
+Please copy ~/n2t_create/apache.n2t to /etc/init.d/apache.n2t and set up chkconfig so that the N2T service comes up on machine (re)boot.
+
+When ready, adjust eggnog_conf values to turn on crontab for things like
+prefix harvesting, error checks, backups, etc.
+
+When all is stable, arrange for Nagios web service monitoring.
+
+To switch between two main utility directories, use "cd $sn; pd $se".
+
+EOT
+	exit
+}

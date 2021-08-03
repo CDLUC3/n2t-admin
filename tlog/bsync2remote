@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+
+set -u			# treat unset variables as an error when substituting
+export LANG=en_US.UTF-8
+export LC_ALL=C		# to deal with unicode errors
+
+ilog=~/logs/iddumper_log	# a few comments, including next harvest args
+idcache=~/logs/iddumper_cache	# cache, actually a prefix before, eg, "_ezid"
+aptop=~/sv/cur/apache2		# where current live binders are
+dumpertop=~/sv/cur/build/eggnog.migr	# where iddump-aware egg code is yyy
+rhost=n2t@ids-n2t2-stg.n2t.net
+
+me=$( basename $0 )
+function usage {
+	cat << EOT
+
+SYNOPSIS                          ($0)
+    $me - periodically find modified ids and sync to remote binders
+
+USAGE
+    $me RemoteHost
+
+DESCRIPTION
+    Running this tool will
+
+     (a) harvest ids modified since the previous harvest date recorded at the
+         end of \$ilog ($ilog),
+
+     (b) distribute them to (for now) two per-binder caches,
+           ~/logs/iddumper_cache_ezid
+           ~/logs/iddumper_cache_oca
+
+     (c) append new (current) harvest time to \$ilog in prep for next run,
+
+     (d) feed cached ids to "egg iddump" to create images of the changed ids
+         to be copied to binders at RemoteHost (eg, $rhost).
+
+    This periodic harvest and miniature dump/restore scenario keeps remote
+    binders in sync with local binders.
+
+LIMITATIONS
+    xxx Currently assumes only EZID and OCA binders are being updated.
+
+    xxx Script currently lives in ~/tlog directory.
+
+EOT
+}
+
+# Next is a Perl program to process tlog output and distribute modified ids
+# to binder-specific lists. Save program to $perl_prog to be run later.
+
+# XXX make this work for all binders
+# XXX consider storing next harvest record other than in iddumper_log
+
+read -r -d '' perl_prog << 'EOT'
+
+	use 5.10.1;
+	use strict;
+	use warnings;
+
+	if (! open(EIDS, ">$ENV{IDCACHE}_ezid")) {
+		say STDERR "iddumper ezid ids $ENV{IDCACHE}_ezid: $!";
+		exit 1;
+	}
+	if (! open(OIDS, ">$ENV{IDCACHE}_oca")) {
+		say STDERR "iddumper oca ids $ENV{IDCACHE}_oca: $!";
+		exit 1;
+	}
+	if (! open(ILOG, ">>$ENV{ILOG}")) {
+		say STDERR "iddumper log $ENV{ILOG}: $!";
+		exit 1;
+	}
+	my ($binder, $id);
+	while (<STDIN>) {
+		if (/^ (\S+) (.*)/) {
+			($binder, $id) = ($1, $2);
+			$binder eq 'oca' and
+				say(OIDS $id), next;
+			$binder eq 'ezid' and
+				say(EIDS $id), next;
+			# we don't expect to get here
+			say STDERR
+				"ERROR: iddumper unexpected binder ($binder) ",
+				"with id $id";
+			next;
+		}
+		/^#/ and print(ILOG) and	# comments to little log, one
+			next;		# of which gives args for next harvest
+	}
+	close(ILOG); close(OIDS); close(EIDS);
+EOT
+
+# MAIN
+
+ruserhost=${1:-}
+[[ ! "$ruserhost" ]] && {
+	usage
+	exit 1
+}
+
+# Get the tlog command we will run, but taint check in advance.
+
+tlogargs=$( tail -4 $ilog | perl -nE '
+  /# next harvest: (\d\d\d\d\.\d\d\.\d\d\_\d\d:\d\d:\d\d\.?\d*) (\S+)$/ and
+  	($starttime, $file) = ($1, $2),
+	($file ne "-" && ! -e $file and
+		say(STDERR "ERROR: bad file ($file)"),
+		exit(1),
+	),
+	say($starttime, " ", $file);
+' | tail -1	# in case there are two harvest lines, just want last
+)
+
+[[ ! "$tlogargs" ]] && {
+	echo "ERROR: $(date) - bad or empty next harvest args" 1>&2
+	exit 1;
+}
+
+echo "#"
+echo "# $me:"
+echo "#    Creating cached id lists under $idcache..."
+echo "#    Running tlog --iddump $tlogargs"
+echo "#    EZID" "$( egg -d $aptop/binders/ezid mstat | grep bindings )"
+echo "#    OCA " "$( egg -d $aptop/binders/oca  mstat | grep bindings )"
+echo "#"
+
+#### The main event.
+
+tlog --iddump $tlogargs | ILOG=$ilog IDCACHE=$idcache perl -E "$perl_prog"
+
+# for testing
+#ILOG=$ilog IDCACHE=$idcache perl -E "$perl_prog" < yy
+
+(cd $dumpertop;			# we need special, non-installed "egg"
+
+	echo "#    Current directory for local iddump: $dumpertop"
+	echo "#"
+	echo "# ======== REMOTE BINDER EZID ========"
+	echo "# Remote host for idload is $ruserhost"
+	echo "#"
+	< ${idcache}_ezid \
+	    perl -Mblib egg iddump $aptop/binders/ezid \
+		| ssh $ruserhost 'n2t ezid idload $sa/binders/ezid'
+	echo "#"
+	echo "# ======== REMOTE BINDER OCA ========"
+	echo "# Remote host for idload is $ruserhost"
+	echo "#"
+	< ${idcache}_oca \
+	    perl -Mblib egg iddump $aptop/binders/oca \
+		| ssh $ruserhost 'n2t oca idload $sa/binders/oca'
+)
+

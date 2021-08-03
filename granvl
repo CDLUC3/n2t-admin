@@ -39,6 +39,7 @@ OPTIONS
 EXAMPLES
             \$ $me /IUPUI/ ~/shoulders/master_shoulders.txt
             \$ $me 'v("%3a/basecount") ne v("%3a/oacounter")' mdump_file
+            \$ $me -x 'v("what") eq "12345"' main_naans
 
 EOT
 	}

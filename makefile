@@ -34,10 +34,14 @@ QLOGLINKS=$(QL)/access_log $(QL)/error_log $(QL)/rewrite_log \
 	$(QL)/binders/ezid/rrm.rlog
 
 # default target
-basic: basicdirs basicfiles hostname svu utilities $(HOME)/init.d/apache crontab
+basic: basicdirs basicfiles hostname svu utilities $(HOME)/init.d/apache crontab tlogdir
 
 # a bigger target
 all: basic n2t_create.tar.gz
+
+# a recursive target
+tlogdir:
+	(cd tlog; make)
 
 # sub-targets of "basic"
 utilities: $(UTILITIES) $(LLIB)/NAAN.pm 

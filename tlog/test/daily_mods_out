@@ -1,0 +1,143 @@
+# ======== 1900.01.01_00:00:00.000000 to 1900.01.02
+== ops
+== ops encountered:             0
+== ids
+== ids encountered:             0
+== testid classes
+== testid classes encountered:             0
+== ids modified
+   sorted to optimize btree insertion time
+== ids modified:             0
+         internal testing lines             0
+               resolution lines             0
+# ======== 2017.12.31_23:47:58.683977 to 2018.01.01
+== ops
+            5 set
+== ops encountered:             1
+== ids
+== ids encountered:             5
+== testid classes
+            5 ark:
+== testid classes encountered:             1
+== ids modified
+   sorted to optimize btree insertion time
++=mod== oca ark:/13960/t05x8qt80
++=mod== oca ark:/13960/t1gj5wr9s
++=mod== oca ark:/13960/t6b348k6x
++=mod== oca ark:/13960/t7mq1fj0g
++=mod== oca ark:/13960/t8x98mg3p
+== ids modified:             5
+         internal testing lines             0
+               resolution lines             0
+           non-resolution lines           500
+# ======== 2018.01.01_00:00:00.236711 to 2018.01.02
+== ops
+           12 set
+== ops encountered:             1
+== ids
+== ids encountered:            12
+== testid classes
+           12 ark:
+== testid classes encountered:             1
+== ids modified
+   sorted to optimize btree insertion time
++=mod== oca ark:/13960/t0tr29s8g
++=mod== oca ark:/13960/t14n5kt9w
++=mod== oca ark:/13960/t23c2fv1w
++=mod== oca ark:/13960/t2f82rs1s
++=mod== oca ark:/13960/t3cz9ms4s
++=mod== oca ark:/13960/t3qv9xq2q
++=mod== oca ark:/13960/t4pk6sq43
++=mod== oca ark:/13960/t51g73n35
++=mod== oca ark:/13960/t6063zn4p
++=mod== oca ark:/13960/t78t14k7h
++=mod== oca ark:/13960/t8kd89j29
++=mod== oca ark:/13960/t9w15gg33
+== ids modified:            12
+         internal testing lines             0
+               resolution lines             0
+           non-resolution lines           500
+  -- (end test/transaction_log_test)
+# ======== 2020.06.16_02:37:10.729370 to 2020.06.17
+      * Log end at 2020.06.16_02:40:02.038848
+== ops
+           11 set
+== ops encountered:             1
+== ids
+== ids encountered:            11
+== testid classes
+           10 ark:
+            1 doi:
+== testid classes encountered:             2
+== ids modified
+   sorted to optimize btree insertion time
++=mod== +n2t doi:10.7272/Q65M63XF
++=mod== oca ark:/13960/t05z15t44
++=mod== oca ark:/13960/t14n81t6z
++=mod== oca ark:/13960/t1gj8br7b
++=mod== oca ark:/13960/t2f856s0t
++=mod== oca ark:/13960/t2s55hp7n
++=mod== oca ark:/13960/t3qw2cq4r
++=mod== oca ark:/13960/t51g9jn2t
++=mod== oca ark:/13960/t6b36qk3m
++=mod== oca ark:/13960/t7kq6vm98
++=mod== oca ark:/13960/t8wb41k02
+== ids modified:            11
+         internal testing lines             0
+               resolution lines             0
+           non-resolution lines           502
+
+============================ TOTALS ================================
+# from log test/transaction_log_test
+# ======== 1900.01.01_00:00:00.000000 to 2020.06.16_02:40:02.038848
+== ops
+           28 set
+== ops encountered:             1
+== ids
+== ids encountered:            28
+== testid classes
+           27 ark:
+            1 doi:
+== testid classes encountered:             2
+== ids modified
+   sorted to optimize btree insertion time
++=mod== +n2t doi:10.7272/Q65M63XF
++=mod== oca ark:/13960/t05x8qt80
++=mod== oca ark:/13960/t05z15t44
++=mod== oca ark:/13960/t0tr29s8g
++=mod== oca ark:/13960/t14n5kt9w
++=mod== oca ark:/13960/t14n81t6z
++=mod== oca ark:/13960/t1gj5wr9s
++=mod== oca ark:/13960/t1gj8br7b
++=mod== oca ark:/13960/t23c2fv1w
++=mod== oca ark:/13960/t2f82rs1s
++=mod== oca ark:/13960/t2f856s0t
++=mod== oca ark:/13960/t2s55hp7n
++=mod== oca ark:/13960/t3cz9ms4s
++=mod== oca ark:/13960/t3qv9xq2q
++=mod== oca ark:/13960/t3qw2cq4r
++=mod== oca ark:/13960/t4pk6sq43
++=mod== oca ark:/13960/t51g73n35
++=mod== oca ark:/13960/t51g9jn2t
++=mod== oca ark:/13960/t6063zn4p
++=mod== oca ark:/13960/t6b348k6x
++=mod== oca ark:/13960/t6b36qk3m
++=mod== oca ark:/13960/t78t14k7h
++=mod== oca ark:/13960/t7kq6vm98
++=mod== oca ark:/13960/t7mq1fj0g
++=mod== oca ark:/13960/t8kd89j29
++=mod== oca ark:/13960/t8wb41k02
++=mod== oca ark:/13960/t8x98mg3p
++=mod== oca ark:/13960/t9w15gg33
+== ids modified:            28
+         internal testing lines             0
+               resolution lines             0
+           non-resolution lines          1502
+         internal testing lines             0
+                pre-start lines             0
+
+         total resolution lines             0
+     total non-resolution lines          1502
+        sum of the above totals          1502
+          error lines processed             0
+          total lines processed          1502

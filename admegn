@@ -638,12 +638,49 @@ function bstat {
 	done
 }
 
+# NAANs file usually overridden during pfx validation
+
+NAANsFile=
+
+function validate_naans {
+
+	[[ "$1" ]] &&
+		NAANsFile="$1"
+	#perl - $NAANsFile << 'EOT'
+	perl - "$1" << 'EOT'
+
+	# start embedded Perl program
+
+	use 5.10.1;
+	use strict;
+	use warnings;
+
+        use lib "/apps/n2t/local/lib";
+        use NAAN;
+        my $contact_info = 1;   # 1 means contact info should be present
+	my $linenums = 1;	# 1 means print errors with line numbers
+				# 0 for single entry validation
+        my ($ok, $msg, $Rerrs) =	# prints errors and validation status
+                NAAN::validate_naans($ARGV[0], $contact_info, $linenums);
+#NAAN::validate_naans($main_naans, $contact_info, $linenums);
+
+	for my $e (@$Rerrs) {
+	       say $e;
+	}
+	say $msg;
+	exit(! $ok);
+
+	# end embedded Perl program
+EOT
+	return
+}
+
 # these sources usually overridden during pfx validation
 #
 ShouldersFile=~/shoulders/master_shoulders.txt	# default
 NAANsFile=~/naans/master_naans	# default
 
-function validate_naans {
+function xxxvalidate_naans {
 
 	[[ "$1" ]] &&
 		NAANsFile="$1"
@@ -838,7 +875,6 @@ function validate_naans {
 EOT
 	return
 }
-
 # Doc for script /home/cdlinfra/ssl/script/cert_sync.sh at
 # https://confluence.ucop.edu/display/CUG/SSL+Certificate+Management+Users+Guide
 
