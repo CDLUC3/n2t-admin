@@ -5,10 +5,11 @@ SHELL=bash
 APPHOME=/apps/n2t
 PUB=$(APPHOME)/sv/cur/apache2/htdocs/e/pub
 PFX_SOURCES= $(PUB)/naan_registry.txt $(PUB)/naan_table.txt $(PUB)/shoulder_registry.txt $(PUB)/ebi.anvl
-INSTALL= $(APPHOME)/local/bin/tlog
-ALL= venv prefixes.txt doi_naans.txt naan_table.txt bin/tlog $(INSTALL)
+#INSTALL= $(APPHOME)/local/bin/tlog $(APPHOME)/local/bin/lonlat
+LBIN= $(APPHOME)/local/bin
+UTILITIES=$(LBIN)/tlog $(LBIN)/lonlat
+ALL= venv prefixes.txt doi_naans.txt naan_table.txt $(INSTALL)
 # should there be a separate install step?
-
 
 #GROWTH= $(APPHOME)/sv/cur/apache2/htdocs/e/images/naan_growth.png
 
@@ -23,8 +24,14 @@ ALL= venv prefixes.txt doi_naans.txt naan_table.txt bin/tlog $(INSTALL)
 # 2010-11,0,43029
 
 #all: virtual_env bin bin/tlog.py bin/tlog doi_naans.txt $(APPHOME)/local/bin/tlog
-all: $(ALL) $(INSTALL)
+all: $(ALL) utilities
 	@true
+
+utilities: $(UTILITIES)
+
+# this uses a "static pattern"
+$(UTILITIES): $(LBIN)/%: %
+	cp -p $< $(LBIN)
 
 ## XXX maybe fresh copies should always be in ../e/pub ?
 ##     so we can drop this harvest
@@ -67,8 +74,10 @@ plot: venv/bin/f2py
 
 # f2py is installed by numpy, which is required by matplotlib
 # kludge: let f2py's existence signal whether matplotlib is installed
+# install geopy at same time (for lonlat.sh and openstreetmap)
 venv/bin/f2py: venv
 	source venv/bin/activate && pip install matplotlib
+	source venv/bin/activate && pip install geopy
 
 # this script calls bin/tlog.py via the correct venv-established python binary
 bin/tlog: bin bin/tlog.py tlog.sh
@@ -77,12 +86,15 @@ bin/tlog: bin bin/tlog.py tlog.sh
 bin/tlog.py: bin tlog.py
 	cp tlog.py $@
 
+bin/lonlat: bin lonlat.sh
+	cp lonlat.sh $@
+
 bin:
 	mkdir -p $@
 
-# make changes in tlog.sh or tlog.py visible at system level
-$(INSTALL): bin/tlog
-	cp -p $^ $@
+## make changes in tlog.sh or tlog.py visible at system level
+#$(INSTALL): bin/tlog bin/lonlat
+#	cp -p $^ $@
 
 # Save a CSV version of EBI prefixes file, and add duplicates for aliases (kludge).
 
