@@ -47,7 +47,7 @@ $(UTILITIES): $(LBIN)/%: %
 #	cp -p $^ $@
 #	@echo "Image at https://$(EGNAPA_HOST)/e/images/naan_growth.png"
 
-naan_growth.png: plot growth.py naan_dates venv
+naan_growth.png: matplotlib growth.py naan_dates venv
 	venv/bin/python growth.py
 
 # if newer, local copy overrides published copy
@@ -68,16 +68,17 @@ venv/bin/pytest: venv
 venv:
 	python3 -m venv venv
 
-# yyy temporary no-op
-plot: venv/bin/f2py
+# crude but simple
+matplotlib:
+	(source venv/bin/activate; \
+		pip list | grep $@ >/dev/null || pip install $@)
 	@true
 
-# f2py is installed by numpy, which is required by matplotlib
-# kludge: let f2py's existence signal whether matplotlib is installed
-# install geopy at same time (for lonlat.sh and openstreetmap)
-venv/bin/f2py: venv
-	source venv/bin/activate && pip install matplotlib
-	source venv/bin/activate && pip install geopy
+# crude but simple
+geopy:
+	(source venv/bin/activate; \
+		pip list | grep $@ >/dev/null || pip install $@)
+	@true
 
 # this script calls bin/tlog.py via the correct venv-established python binary
 bin/tlog: bin bin/tlog.py tlog.sh
@@ -86,7 +87,7 @@ bin/tlog: bin bin/tlog.py tlog.sh
 bin/tlog.py: bin tlog.py
 	cp tlog.py $@
 
-bin/lonlat: bin lonlat.sh
+bin/lonlat: bin geopy lonlat.sh
 	cp lonlat.sh $@
 
 bin:
