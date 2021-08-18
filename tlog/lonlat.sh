@@ -2,7 +2,7 @@
 
 # Invoke python script via its virtual env
 
-DIR=/apps/n2t/sv/cur/build/eggnog/t/n2t/e/admin
+DIR=/apps/n2t/n2t_create/tlog
 
 [[ ! "$1" ]] && {
 	echo "Expects an address argument, prints longitude and latitude (x, y)"
