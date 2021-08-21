@@ -28,7 +28,7 @@ all: $(ALL)
 	@true
 
 # this uses a "static pattern"
-$(UTILITIES): $(LBIN)/%: %
+$(UTILITIES): $(LBIN)/%: bin/%
 	cp -p $< $(LBIN)
 
 ## XXX maybe fresh copies should always be in ../e/pub ?
@@ -66,20 +66,20 @@ venv/bin/pytest: venv
 venv:
 	python3 -m venv venv
 
-# crude but simple
+# crude but works
 matplotlib:
 	(source venv/bin/activate; \
 		pip list | grep $@ >/dev/null || pip install $@)
 	@true
 
-# crude but simple
+# crude but works
 geopy:
 	(source venv/bin/activate; \
 		pip list | grep $@ >/dev/null || pip install $@)
 	@true
 
 # this script calls bin/tlog.py via the correct venv-established python binary
-bin/tlog: bin bin/tlog.py tlog.sh
+bin/tlog: bin matplotlib bin/tlog.py tlog.sh
 	cp tlog.sh $@
 
 bin/tlog.py: bin tlog.py
