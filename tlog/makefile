@@ -8,7 +8,7 @@ PFX_SOURCES= $(PUB)/naan_registry.txt $(PUB)/naan_table.txt $(PUB)/shoulder_regi
 #INSTALL= $(APPHOME)/local/bin/tlog $(APPHOME)/local/bin/lonlat
 LBIN= $(APPHOME)/local/bin
 UTILITIES=$(LBIN)/tlog $(LBIN)/lonlat
-ALL= venv prefixes.txt doi_naans.txt naan_table.txt $(INSTALL)
+ALL= venv prefixes.txt doi_naans.txt naan_table.txt $(UTILITIES)
 # should there be a separate install step?
 
 #GROWTH= $(APPHOME)/sv/cur/apache2/htdocs/e/images/naan_growth.png
@@ -24,10 +24,8 @@ ALL= venv prefixes.txt doi_naans.txt naan_table.txt $(INSTALL)
 # 2010-11,0,43029
 
 #all: virtual_env bin bin/tlog.py bin/tlog doi_naans.txt $(APPHOME)/local/bin/tlog
-all: $(ALL) utilities
+all: $(ALL)
 	@true
-
-utilities: $(UTILITIES)
 
 # this uses a "static pattern"
 $(UTILITIES): $(LBIN)/%: %
@@ -87,8 +85,8 @@ bin/tlog: bin bin/tlog.py tlog.sh
 bin/tlog.py: bin tlog.py
 	cp tlog.py $@
 
-bin/lonlat: bin geopy lonlat.sh
-	cp lonlat.sh $@
+bin/lonlat: bin geopy lonlat
+	cp lonlat $@
 
 bin:
 	mkdir -p $@

@@ -21,7 +21,7 @@ location = geocoder.geocode("$1")
 if location == None:
     sys.exit("Error: $1: address yielded no longitute/latitude")
 
-print([location.longitude, location.latitude])
+print(location.longitude, location.latitude)
 
 EOT
 
