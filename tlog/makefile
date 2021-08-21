@@ -23,7 +23,6 @@ ALL= venv prefixes.txt doi_naans.txt naan_table.txt $(UTILITIES)
 # 2010-10,0,8
 # 2010-11,0,43029
 
-#all: virtual_env bin bin/tlog.py bin/tlog doi_naans.txt $(APPHOME)/local/bin/tlog
 all: $(ALL)
 	@true
 
@@ -45,7 +44,7 @@ $(UTILITIES): $(LBIN)/%: bin/%
 #	cp -p $^ $@
 #	@echo "Image at https://$(EGNAPA_HOST)/e/images/naan_growth.png"
 
-naan_growth.png: matplotlib growth.py naan_dates venv
+naan_growth.png: growth.py naan_dates venv
 	venv/bin/python growth.py
 
 # if newer, local copy overrides published copy
@@ -63,37 +62,33 @@ pytest: venv/bin/pytest venv
 venv/bin/pytest: venv
 	source venv/bin/activate && pip install pytest
 
+# crude
 venv:
 	python3 -m venv venv
+	pip install matplotlib geopy
+	mkdir -p bin
 
-# crude but works
-matplotlib:
-	(source venv/bin/activate; \
-		pip list | grep $@ >/dev/null || pip install $@)
-	@true
-
-# crude but works
-geopy:
-	(source venv/bin/activate; \
-		pip list | grep $@ >/dev/null || pip install $@)
-	@true
+## crude but works
+#matplotlib:
+#	source venv/bin/activate; \
+#		pip list | grep $@ >/dev/null || pip install $@
+#
+#geopy:
+#	(source venv/bin/activate; \
+#		pip list | grep $@ >/dev/null || pip install $@)
 
 # this script calls bin/tlog.py via the correct venv-established python binary
-bin/tlog: bin matplotlib bin/tlog.py tlog.sh
-	cp tlog.sh $@
+bin/tlog: tlog
+	cp -p tlog $@
 
-bin/tlog.py: bin tlog.py
-	cp tlog.py $@
+tlog: tlog.py
+	touch tlog
 
-bin/lonlat: bin geopy lonlat
-	cp lonlat $@
+bin/tlog.py: tlog.py
+	cp -p tlog.py $@
 
-bin:
-	mkdir -p $@
-
-## make changes in tlog.sh or tlog.py visible at system level
-#$(INSTALL): bin/tlog bin/lonlat
-#	cp -p $^ $@
+bin/lonlat: lonlat
+	cp -p lonlat $@
 
 # Save a CSV version of EBI prefixes file, and add duplicates for aliases (kludge).
 
