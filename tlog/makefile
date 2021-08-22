@@ -65,7 +65,7 @@ venv/bin/pytest: venv
 # crude
 venv:
 	python3 -m venv venv
-	pip install matplotlib geopy
+	source venv/bin/activate && pip install matplotlib geopy
 	mkdir -p bin
 
 ## crude but works
