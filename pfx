@@ -812,8 +812,26 @@ function validate_ebi {
 	jq . ebinewreg.json > ebi_pp.js || {
 		echo ebinewreg.json: bad javascript 1>&2
 	}
-	jq '.payload.namespaces[]' ebi_pp.js > x
+	# jq -s (slurp) below causes an array to be output
+	jq '.payload.namespaces[] | .resources[] as $r | {
+		prefix,
+		name,
+		"pcode": $r.providerCode,
+		"mcode": $r.mirId,
+		"rule": $r.urlPattern,
+		"sampleid": $r.sampleId,
+		"org": $r.institution.name,
+		"ror": $r.institution.rorId,
+		"regex": .pattern,
+		"prefixed": .namespaceEmbeddedInLui,
+		deprecated,
+		"prefixid": .id
+	}' < ebi_pp.js | jq -s '.' > x 2>&1
 
+# XXX at least two entries have deprecated as "true"
+# XXX how are synonyms/aliases done? it looks like idot is no longer supporting
+#     "pmid" and "taxon" (unlike n2t)
+# XXX BUG! in synonym! see pmid entry ("KEGG") and following in prefixex.yaml
 	# jq -r '@text "name: \(.foo)", "val: \(.bar)"' xi
 
 
