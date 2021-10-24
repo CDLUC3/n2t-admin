@@ -13,6 +13,8 @@ MAILTO = 'jak@ucop.edu'
 
 # Every day at 02:15, check for an updated cert from Let's Encrypt. If any,
 # back up current cert (.bak), copy in new one, and restart apache or notify.
+# To rollback to the old cert, it suffices to rename ~/warts/ssl/n2t.net.bak/
+# to ~/warts/ssl/n2t.net/ and do "apache restart".
 
 15 2 * * 1-7 bash -lc 'cmd=$(egg cfq new_cert_action); if [[ "$cmd" ]]; then admegn cert_check "$cmd"; fi' >> logs/sysupdate_log 2>&1
 
