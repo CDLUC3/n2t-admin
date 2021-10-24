@@ -13,7 +13,10 @@ cc = 20  # counter cardinality
 print(f" v: n= m ")
 #for n in range(1, 61):
 for n in range(1, nc*cc+1):
+    ns = (n + nc//2) % nc
     v = ((n-1) % nc) * cc + ((n-1)//nc) + 1
+    v = ((ns-1) % nc) * cc + ((ns-1)//nc) + 1
+
     #m = (v//c)*c
     #m = ((v-1) % k) * c + ((v-1) % c)
     # XY, Y is number of 1s, X number of 10s

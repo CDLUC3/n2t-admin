@@ -639,6 +639,8 @@ function bstat {
 }
 
 # NAANs file usually overridden during pfx validation
+# xxx this function code is maintained in parallel between the N2T
+#     admegn script and the "naans" script in the naan_registry repo
 
 NAANsFile=
 
@@ -646,7 +648,7 @@ function validate_naans {
 
 	[[ "$1" ]] &&
 		NAANsFile="$1"
-	#perl - $NAANsFile << 'EOT'
+
 	perl - "$1" << 'EOT'
 
 	# start embedded Perl program
@@ -662,7 +664,6 @@ function validate_naans {
 				# 0 for single entry validation
         my ($ok, $msg, $Rerrs) =	# prints errors and validation status
                 NAAN::validate_naans($ARGV[0], $contact_info, $linenums);
-#NAAN::validate_naans($main_naans, $contact_info, $linenums);
 
 	for my $e (@$Rerrs) {
 	       say $e;
@@ -675,6 +676,7 @@ EOT
 	return
 }
 
+# xxx drop this old code soon
 # these sources usually overridden during pfx validation
 #
 ShouldersFile=~/shoulders/master_shoulders.txt	# default
