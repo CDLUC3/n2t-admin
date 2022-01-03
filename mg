@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -u
-notify=jak@ucop.edu	# xxx failures
+notify=jakkbl@gmail.com	# xxx failures
 repsetlog=$HOME/logs/mg_repsetlog
 configfile=$HOME/warts/env.sh
 config_unread=1

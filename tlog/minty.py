@@ -5,17 +5,36 @@ tlogdir = "/apps/n2t/tlog"
 naans_infile = tlogdir + '/naan_dates'
 naans_image_file = 'naan_growth.png'
 
+"""
+6 counters holding 10 each: total 60 values
+7 counters holding 10 each: total 70 values
+6 counters holding 12 each: total 72 values
+"""
+
 #for n in range(1, 61):
 nc = 6   # number of counters
 cc = 10  # counter cardinality
-cc = 20  # counter cardinality
+cc = 12  # counter cardinality
+#cc = 20  # counter cardinality
+
+"""
+how to take a sping and convert to an minting ordinal s.t. we can
+then tell the next and previous?
+- length of sping determines much, based on template eedeedeed...eedk
+examples: e, ek, eek, eedk, eedek, eedeek, eedeedk, ... ?
+verify: for e (radix 19) convert to integer, nc=290?, cc=?  impossible?
+verify: for ek (radix 19) convert to integer, nc=?, cc=?
+verify: for eek (radix 19) convert to integer, nc=?, cc=?
+"""
 
 print(f" v: n= m ")
 #for n in range(1, 61):
 for n in range(1, nc*cc+1):
     ns = (n + nc//2) % nc
+    # v is value minted?
     v = ((n-1) % nc) * cc + ((n-1)//nc) + 1
-    v = ((ns-1) % nc) * cc + ((ns-1)//nc) + 1
+    # xxx trying to generalize beyond current hardwired values
+    #v = ((ns-1) % nc) * cc + ((ns-1)//nc) + 1
 
     #m = (v//c)*c
     #m = ((v-1) % k) * c + ((v-1) % c)

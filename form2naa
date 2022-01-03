@@ -7,7 +7,7 @@ use warnings;
 use YAML;
 use Encode;
 
-# Author:  John A. Kunze, jak@ucop.edu, California Digital Library
+# Author:  John A. Kunze, jakkbl@gmail.com, California Digital Library
 # Copyright (c) 2016 UC Regents
 
 my $cmd = $0;

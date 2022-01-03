@@ -14,7 +14,7 @@ export LANG=en_US.UTF-8
 #		"error: can't find PFX_... environment variable settings" 1>&2
 #fi
 
-pfxadmin=jak@ucop.edu		# yyy dumb
+pfxadmin=jakkbl@gmail.com		# yyy dumb
 mainout=prefixes.yaml
 pubout=cdl_ebi_prefixes.yaml
 fullout=n2t_full_prefixes.yaml
@@ -827,6 +827,30 @@ function validate_ebi {
 		deprecated,
 		"prefixid": .id
 	}' < ebi_pp.js | jq -s '.' > x 2>&1
+# find these files in $sa/pfx/build/
+# jq -r yamlify2 /apps/n2t/sv/cv2/apache2/pfx/build/x > y
+# Want to match current? (below)
+#-
+#  namespace: chebi
+#  type: "scheme"
+#  name: "ChEBI"
+#  description: "Chemical Entities of Biological Interest (ChEBI) is a freely available dictionary of molecular entities focused on 'small' chemical compounds."
+#  subject: "metabolite; ontology; chemical"
+#  prefixed: "true"
+#  pattern: "^CHEBI:\\d+$"
+#  sort_score: "6"
+#  provider_id: "MIR:00100009"
+#  primary: "true"
+#  provider_code: "ebi"
+#  title: "ChEBI (Chemical Entities of Biological Interest)"
+#  redirect: "https://www.ebi.ac.uk/chebi/searchId.do?chebiId=$id"
+#  test: "CHEBI:36927"
+#  homepage: "https://www.ebi.ac.uk/chebi/"
+#  institution: "European Bioinformatics Institute, Hinxton, Cambridge"
+#  location: "UK"
+#  keyword: "carbon-14"
+#  state: "98:Up"
+
 
 # XXX at least two entries have deprecated as "true"
 # XXX how are synonyms/aliases done? it looks like idot is no longer supporting

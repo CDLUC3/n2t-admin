@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # xxx do a system version of this, eg, EGNAPA_NOTIFY?
-notify=jak@ucop.edu	# xxx backup, sysupdate, or other failure
+notify=jakkbl@gmail.com	# xxx backup, sysupdate, or other failure
 
 # Add TMPDIR because of Berkeley DB performance with default "/"
 export TMPDIR=~/backups

@@ -1,6 +1,6 @@
 # n2t crontab file -- stg version
 
-MAILTO=jak@ucop.edu
+MAILTO=jakkbl@gmail.com
 
 # Fetch/import prefixes from EBI at 05:30 GMT, but only on one of possibly
 # many instances.

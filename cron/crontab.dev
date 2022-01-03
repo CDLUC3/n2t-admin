@@ -9,7 +9,7 @@
 
 EGG = '--home /apps/n2t/sv/cur/apache2'
 PATH = '/apps/n2t/sv/cur/bin:/apps/n2t/local/bin:/usr/bin:/bin'
-MAILTO = 'jak@ucop.edu'
+MAILTO = 'jakkbl@gmail.com'
 
 # Update OS automatically on schedule determined by patch_* setting in
 # /apps/n2t/sv/cur/apache2/eggnog_conf and queried by "egg cfq patch_today".

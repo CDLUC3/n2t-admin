@@ -1,6 +1,6 @@
 # n2t crontab file -- prd version
 
-MAILTO=jak@ucop.edu
+MAILTO=jakkbl@gmail.com
 
 # Every 2 mins Mon-Sat check local resolution is working.  If not, an alert
 # email is sent and apache restarted; this mitigates the "off-by-one" error.

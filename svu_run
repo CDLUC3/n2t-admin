@@ -3,7 +3,7 @@
 # XXXXXX need way to return exit status up through eval, eg, currently
 #   we uselessly check return from 'svu_run init'
 
-# Author: John Kunze, jak@ucop.edu
+# Author: John Kunze, jakkbl@gmail.com
 # Copyright (c) 2012-2015, UC Regents.  BSD-type open source license.
 
 VERSION=0.1			# version of this script

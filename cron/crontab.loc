@@ -1,6 +1,6 @@
 # n2t crontab file -- local version
 
-MAILTO=jak@ucop.edu
+MAILTO=jakkbl@gmail.com
 SHELL=/usr/local/bin/bash
 sv=/Users/jak/sv/cur
 
