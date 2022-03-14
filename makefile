@@ -52,6 +52,7 @@ $(UTILITIES): $(LBIN)/%: %
 
 $(LLIB)/NAAN.pm: NAAN.pm
 	cp -p $^ $@
+	@echo "Did you sync changes to the naan_reg_priv repo?"
 
 svu: $(LBIN)/svu_run $(HOME)/sv
 

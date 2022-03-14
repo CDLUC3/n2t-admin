@@ -2,6 +2,8 @@
 
 # make sure stdout and stderr are encoded for utf8
 
+# XXX add count of days and average stats per day
+
 import sys, codecs
 
 sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())

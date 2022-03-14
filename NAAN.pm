@@ -105,6 +105,18 @@ sub element_check { my( $Rerrs, $k, $v )=@_;	# one key/value pair
 	elsif ($k eq 'how') {
 		$v =~ m|ORGSTATUS| and
 			push @$Rerrs, lerr($lcnt, "ORGSTATUS should be either NP or FP");
+		$v =~ m/^ *[^|]*\|([^|]+ *)\|/ or
+			push @$Rerrs, lerr($lcnt, "Malformed policy in $v: ",
+				"should contain at least two '|' chars"),
+			return
+		;
+		my $policy = $1;
+		$policy !~ m|\(:unkn\)| and $policy =~ m|[a-z]| and
+			push @$Rerrs, lerr($lcnt, "Policy ($policy) can contain no lowercase letters ");
+		#my $cnt = $policy =~ m|\b[LUM]C\b|gi and
+		my $cnt = $policy =~ s|\b([LUM]C)\b|$1|gi;
+		$cnt > 1 and
+			push @$Rerrs, lerr($lcnt, "Policy ($policy) must contain only one of LC, UC, or MC");
 	}
 }
 
