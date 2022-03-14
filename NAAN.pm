@@ -1,7 +1,7 @@
 package NAAN;
 
 # Author: John A. Kunze, California Digital Library.
-# Copyright 2016-2021 UC Regents. Open source BSD license. 
+# Copyright 2016-2022 UC Regents. Open source BSD license. 
 
 use 5.10.1;
 use strict;
@@ -16,10 +16,11 @@ our %EXPORT_TAGS = (all => [ @EXPORT_OK ]);
 
 use Encode;		# to deal with unicode chars
 
-# XXX bad practice -- non-re-entrant code, will be clobbered by other caller
+# XXX globals bad practice? non-re-entrant code, clobbered by other callers?
 my $lcnt = 0;		# current line number (line count)
-my ($badseq1, $badseq2, %naans, %elems, %org_name, %org_acro);
-# XXX horrible practice -- global changed by last caller
+my $ncnt = 0;		# current NAAN entry count
+my $scnt = 0;		# current Shoulder entry count
+my ($badseq1, $badseq2, %naans, %shoulders, %elems, %org_name, %org_acro);
 my $linenumbers = 1;	# whether errors come with line number of entry
 
 sub lerr {	# line error
@@ -55,11 +56,19 @@ sub element_check { my( $Rerrs, $k, $v )=@_;	# one key/value pair
 	# Type-specific checks, with $k known to be defined.
 	#
 	if ($k eq 'what') {		# duplicate check
-		++$naans{$v} > 1 and
-			push @$Rerrs, lerr($lcnt, "NAAN $v duplicated");
-		$v =~ /^(\d\d\d\d\d)$/ or
-			push @$Rerrs, lerr($lcnt, "malformed NAAN ($v): ",
-				"should be NNNNN");
+		if ($v =~ /^(\d\d\d\d\d)$/) {	# pure numeric NAAN
+			$ncnt++;
+			++$naans{$v} > 1 and
+				push @$Rerrs, lerr($lcnt, "NAAN $v duplicated");
+		}
+		elsif ($v =~ m|^(ark:/?\d\d\d\d\d/\w+)$|) {
+			$scnt++;
+			++$shoulders{$v} > 1 and
+				push @$Rerrs, lerr($lcnt, "Shoulder $v duplicated");
+		}
+		else {
+			push @$Rerrs, lerr($lcnt, "malformed NAAN or Shoulder ($v)");
+		}
 	}
 	elsif ($k eq 'who') {
 		my ($oname) = $v =~ m/^\s*(.*?)\s*\(=\)/ or
@@ -104,27 +113,32 @@ sub element_check { my( $Rerrs, $k, $v )=@_;	# one key/value pair
 	}
 	elsif ($k eq 'how') {
 		$v =~ m|ORGSTATUS| and
-			push @$Rerrs, lerr($lcnt, "ORGSTATUS should be either NP or FP");
+			push @$Rerrs, lerr($lcnt,
+				"ORGSTATUS should be either NP or FP");
 		$v =~ m/^ *[^|]*\|([^|]+ *)\|/ or
 			push @$Rerrs, lerr($lcnt, "Malformed policy in $v: ",
 				"should contain at least two '|' chars"),
 			return
 		;
 		my $policy = $1;
-		$policy !~ m|\(:unkn\)| and $policy =~ m|[a-z]| and
-			push @$Rerrs, lerr($lcnt, "Policy ($policy) can contain no lowercase letters ");
-		#my $cnt = $policy =~ m|\b[LUM]C\b|gi and
-		my $cnt = $policy =~ s|\b([LUM]C)\b|$1|gi;
-		$cnt > 1 and
-			push @$Rerrs, lerr($lcnt, "Policy ($policy) must contain only one of LC, UC, or MC");
+		if ($policy !~ m|\(:unkn\)|) {
+			$policy =~ m|[a-z]| and
+				push @$Rerrs, lerr($lcnt,
+			  "Policy ($policy) can contain no lowercase letters ");
+			# use s/// (as no-op) to count instances as side-effect
+			my $cnt = $policy =~ s|\b([LUM]C)\b|$1|gi;
+			$cnt > 1 and push @$Rerrs, lerr($lcnt,
+			  "Policy ($policy) must contain only one of LC, UC, or MC");
+		}
 	}
 }
+
+# for now we're counting either NAANs or Shoulders or both
 
 sub validate_naans { my( $naanfile, $contact_info, $linenums )=@_;
 
 	my ($c, $s, @uchars);
 	my $Rerrs = [];		# this gets returned
-	my $ecnt = 0;		# current entry (count)
 	my $msg;
 	defined($linenums) and
 		$linenumbers = $linenums;
@@ -150,7 +164,6 @@ sub validate_naans { my( $naanfile, $contact_info, $linenums )=@_;
 			$lcnt += tr|\n||;	# counts \n chars
 			next;
 		}
-		$ecnt++;
 
 		# Need to validate either the full file (internal only,
 		# with contact info) or anonymized file (no "!" fields).
@@ -165,7 +178,7 @@ sub validate_naans { my( $naanfile, $contact_info, $linenums )=@_;
 		$contact_info and $badseq2 = $. != 1 &&
 					/^!/m && ! m{	# if any "!" fields,
 			how:\s+.*?\s*\n			# check their ordering
-			!why:\s+.*?\s*\n
+			(!why:\s+.*?\s*\n)?	# "why" may become deprecated
 			!contact:\s+.*?\s*\n
 		}xs;
 		$badseq1 and
@@ -203,31 +216,33 @@ sub validate_naans { my( $naanfile, $contact_info, $linenums )=@_;
 			}
 			$s =~ /\P{ascii}/ or	# if there's no non-ascii
 				next;		# present, skip the rest
-
-# Not applicable since opening with :encoding(UTF-8)
-#			# check for annoying non-ascii punctuation
-#			@uchars = split '', decode('utf8', $s);
-#			/\P{ascii}/ && /\p{Punctuation}/ && push(@$Rerrs,
-#				lerr($lcnt,
-#					"Line $lcnt: non-ascii punctuation: ",
-#					encode('utf8', $_)))
-#						for (@uchars);
 		}
 	}
 	close FH;
 
-	if ($ecnt < 1) {
-		return (0, "NOT OK - no NAAN entries found)", $Rerrs);
+	if ($ncnt < 1 and $scnt < 1) {
+		return (0,
+			"NOT OK - no NAAN or Shoulder entries found)", $Rerrs);
 	}
 
-	my @reserved =			# reserved NAANs, not assigned to orgs
+	my @reserved =		# reserved NAANs, not assigned to actual orgs
 		qw( 12345 99152 99166 99999 );
+	if ($ncnt > 0) {	# if any, assume all reserved were defined yyy
+		$ncnt -= scalar @reserved;	# reduce to count only orgs
+	}
+	if ($scnt > 0) {
+		my $x;
+		foreach my $k (keys %shoulders) {	# if non-persistent
+			$k =~ m,/12345|99999/, and	# sources of ARKs,
+				$scnt--;	# reduce to persistent sources
+		}
+	}
 
-	my $numorgs = $ecnt - scalar @reserved;	# reduce to just count orgs
-
-	my $errs = scalar(@$Rerrs);
+	my $numorgs = $ncnt + $scnt;
+	my $errs = scalar @$Rerrs;
 	if ($errs) {
-		$msg = "NOT OK - $naanfile: $numorgs orgs ($ecnt entries), "
+		$msg = "NOT OK - $naanfile: $numorgs orgs "
+			. "($ncnt NAANs + $scnt Shoulders), "
 			. "$errs errors",
 		return(		# error, message, error list
 			0,
@@ -236,10 +251,8 @@ sub validate_naans { my( $naanfile, $contact_info, $linenums )=@_;
 		);
 	}
 
-	# XXX need to add count of orgs in the new shared_naan shoulders
-	# xxx de-dupe orgs for final count?
-	#
-	$msg = "OK - $naanfile: $numorgs orgs ($ecnt entries), $lcnt lines";
+	$msg = "OK - $naanfile: $numorgs orgs "
+		. "($ncnt NAANs + $scnt Shoulders), $lcnt lines";
 	return (1, $msg, $Rerrs);
 }
 
