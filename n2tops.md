@@ -357,14 +357,14 @@ counterparts).
 
 -   n2t-eggnog repository
     -   Purpose: main software (Perl and Bash) behind the N2T service
-    -   Central repository URL: <https://github.com/jkunze/n2t-eggnog>
+    -   Central repository URL: <https://github.com/CDLUC3/n2t-eggnog>
     -   Local filesystem: **\~/sv/cur/build/eggnog**
     -   Description: egg, nog, and anvl2egg commands, plus various Perl
         modules, config files, Bash scripts, and numerous test suites
 
 -   n2t-admin repository
     -   Purpose: N2T admin and automated N2T system build
-    -   Central repository URL: <https://github.com/jkunze/n2t-admin>
+    -   Central repository URL: <https://github.com/CDLUC3/n2t-admin>
     -   Local filesystem: **\~/n2t_create**
     -   Description: creates system software stack and role account from
         scratch; populate **\~/local/bin** with numerous scripts
@@ -373,10 +373,10 @@ counterparts).
     -   Purpose: general-purpose supporting Perl modules (newer than
         their <https://search.cpan.org/~jak/> counterparts)
     -   Local filesystem: **\~/sv/cur/build/File-\...**  
-           file-anvl <https://github.com/jkunze/file-anvl>  
-           file-namaste  <https://github.com/jkunze/file-namaste>  
-           file-pairtree <https://github.com/jkunze/file-pairtree>  
-           file-value <https://github.com/jkunze/file-value>
+           file-anvl <https://github.com/CDLUC3/file-anvl>  
+           file-namaste  <https://github.com/CDLUC3/file-namaste>  
+           file-pairtree <https://github.com/CDLUC3/file-pairtree>  
+           file-value <https://github.com/CDLUC3/file-value>
 
 -   naans repository (obsolete -- ARK Alliance manages NAANs now)
 

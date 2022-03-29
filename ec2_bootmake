@@ -387,7 +387,7 @@ grep "email.*$fakeuser" $gtcf && {
 
 	cd		# go to home directory
 	#git clone git@github.com:jkunze/n2t-admin.git
-	git clone https://github.com/jkunze/n2t-admin.git
+	git clone https://github.com/CDLUC3/n2t-admin.git
 	rm -fr n2t_create	# if it exists the rename below won't work
 	mv n2t-admin n2t_create		# simple rename
 	cd n2t_create
