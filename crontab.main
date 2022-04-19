@@ -9,7 +9,7 @@
 
 EGG = '--home /apps/n2t/sv/cur/apache2'
 PATH = '/apps/n2t/sv/cur/bin:/apps/n2t/local/bin:/usr/bin:/bin'
-MAILTO = 'jakkbl@gmail.com,agould@ucop.edu'
+MAILTO = 'n2tops@ucop.edu'
 
 # Every day at 02:15, check for an updated cert from Let's Encrypt. If any,
 # back up current cert (.bak), copy in new one, and restart apache or notify.
