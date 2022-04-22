@@ -305,18 +305,10 @@ testing step.
 
 ### Administration: monitoring
 
-There are several sources of system monitoring that have been set up
-manually.  All sources notify of outages but take no action themselves.
-
-1.  From CDL, monitoring of CDL hosts is managed by Nagios, with email
-    notification going to the developers' email addresses.
-2.  From monitor.us (a free monitoring service), outage notifications
-    for the primary and replica instances are sent to jak\@ucop.edu.
-3.  From statuscake.com (another free monitoring service, outage notifications
-    are sent to jak\@ucop.edu.
-    
-For CDL monitors, action is required because CDL and UCOP staff pay
-close attention to service faults and will take steps to restart the
+Monitoring of CDL hosts is managed by Nagios, with email notification
+going to the different groups configured into Nagios email addresses.
+When a monitor sends an alert, action is required because CDL and UCOP staff
+pay close attention to service faults and will take steps to restart the
 service themselves unless you formally "acknowledge" the faults.
 
 An easy way to acknowledge a fault is to reply to the emailed CDL Nagios
@@ -368,6 +360,14 @@ counterparts).
     -   Local filesystem: **\~/n2t_create**
     -   Description: creates system software stack and role account from
         scratch; populate **\~/local/bin** with numerous scripts
+
+-   dotfiles repository
+    -   Purpose: heavily used bash functions supporting N2T admin
+    -   Central repository URL: <https://github.com/CDLUC3/dotfiles>
+    -   Local filesystem: **\~/dotfiles**
+    -   Description: defines foundational variables such as $sv used in
+        many utility scripts, as well as interactive shell support with
+	variables such as $se, $sn, $sa, and functions for ssh'ing
 
 -   File-ANVL, File-Namaste, File-Pairtree, File-Value repositories
     -   Purpose: general-purpose supporting Perl modules (newer than
