@@ -14,7 +14,7 @@ export LANG=en_US.UTF-8
 #		"error: can't find PFX_... environment variable settings" 1>&2
 #fi
 
-pfxadmin=jakkbl@gmail.com		# yyy dumb
+pfxadmin=n2tops@ucop.edu
 mainout=prefixes.yaml
 pubout=cdl_ebi_prefixes.yaml
 fullout=n2t_full_prefixes.yaml
