@@ -253,6 +253,98 @@ account via a terminal window by running, for example, `egg -d ezid
 --lock dbinfo all | more`, leaving the `more` pager output on the first
 page, and unpause it by quitting the pager.
 
+### Administration: applying NAAN registry updates
+
+A cronjob runs on the N2T stage instance which generates an email to N2T admins.
+Depending on its content the N2T service admin may need to take actions to
+promote changes to the N2T NAAN registry into production.
+
+2 things to check for:
+- did all tests pass? (subject line "ok")
+- did the naan_registry get updated? (shows up in "harvested updates ready" list)
+
+```
+Date: Thu, 21 Apr 2022 21:31:32 -0700
+To: n2tops@ucop.edu
+Subject: ok: cron hitrnt ids-n2t2-dev.n2t.net
+From: n2t@ids-n2t2-stg.n2t.net (n2t role account)
+```
+
+If subject starts with "ok", then the tests run on stg and dev instances all
+succeeded. If not "ok", then run commands by hand to determine cause of
+failures.  Do NOT promote to production until all tests pass on dev and stg.
+
+```
++==== Thu Apr 21 21:30:02 PDT 2022 hitrnt: harvested updates ready: naan_registry.txt shoulder_registry.txt ebireg.xml ebinewreg.json prefixcc.json
+```
+
+This line shows which files recieved updates during the prefix harvesting
+process.  The last 3 files listed always show up in this list, but can be
+ignored. No action needs to be taken.
+
+If "naan_registry.txt" is listed, then we need to promote NAAN registry
+updates to the production N2T instance using command `pfx pfxsysnc`.  Run this 
+task from the n2t stage host `ids-n2t2-stg.n2t.net`.
+
+1. Log into `ids-n2t2-stg.n2t.net` and become the `n2t` user.  
+   IMPORTANT - simply using `sudo su - n2t` is not sufficient.  You must
+   obtain a true login shell by running ssh to localhost after becoming `nt2`:
+
+   ```
+   agould@localhost:~> ssh ids-n2t2-stg.n2t.net 
+   
+   agould@ids-n2t2-stg:~> sudo su - n2t
+   ids-n2t2-stg:~ n2t<>  $ [svu cv2:cur] who am i
+   agould   pts/0        May 18 11:37 (ias-bastion2-ops-2c.cdlib.org)
+   
+   ids-n2t2-stg:~ n2t<>  $ [svu cv2:cur] ssh localhost
+   ids-n2t2-stg:~ n2t<>  $ [svu cv2:cur] who am i
+   n2t      pts/1        May 18 11:38 (localhost.localdomain)
+   ```
+1. Run `pfx pfxsync` command with production host as argument.  This will clone
+   updated n2t data files onto the prod host, restart nt2 service and run a suite
+   of unit tests to ensure the update is successful:
+
+   ```
+   ids-n2t2-stg:~ n2t<>  $ [svu cv2:cur] pfx pfxsync ids-n2t2-prd.n2t.net
+   +==== initializing pfx on ids-n2t2-prd.n2t.net
+   Initialized
+   +==== copying harvest files
+   ebinewreg.json                         100% 1240KB 113.5MB/s   00:00
+   shoulder_registry.txt                  100% 7727     7.4MB/s   00:00
+   prefixcc.json                          100%  144KB  85.0MB/s   00:00
+   master_shoulders.txt                   100%  103KB  70.4MB/s   00:00
+   naan_registry.txt                      100%  169KB  84.4MB/s   00:00
+     [cut]
+   +==== running test_rollout_n2t_test
+     [cut]
+   ok 61 - BNF redirect
+   ok 62 - UNT redirect
+   ok 63 - SPMC redirect
+   ok 64 - prefix fetch on well-known NAAN preserves UTF-8
+   NB: For an end-user check, open this in your browser (eg, Cmd-Click):
+       https://ids-n2t2-prd.n2t.net/ark:/12345/fk1234
+   ```
+
+1. Validate N2T service is happy. Copy the url in the last line of output
+   and paste it into your browser.  If all is well you will be redirected.
+   to the CDL Service page.
+
+   Alternatively, use `curl` to access this url.  You should see a 
+   HTTP status 302 redirection response:
+
+   ```
+   agould@localhost:~/cdl/ezid/n2t> curl https://ids-n2t2-prd.n2t.net/ark:/12345/fk1234
+   <!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+   <html><head>
+   <title>302 Found</title>
+   </head><body>
+   <h1>Found</h1>
+   <p>The document has moved <a href="https://cdlib.org/services">here</a>.</p>
+   </body></html>
+   ```
+
+
 ### Administration: patching the operating system
 
 Installing operating system updates (often needed for security reasons)
